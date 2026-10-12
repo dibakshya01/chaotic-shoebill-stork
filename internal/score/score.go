@@ -117,7 +117,6 @@ func Build(services []ServiceSpec, runs []RunRecord, openFailOpen map[string]map
 				cell.State = "untested"
 				cell.Score = 0
 			} else {
-				coverageTested++
 				totalTested++
 				cell.Tested = true
 				// worst verdict + mean raw + latest timestamp
@@ -140,6 +139,12 @@ func Build(services []ServiceSpec, runs []RunRecord, openFailOpen map[string]map
 				ageDays := now.Sub(latest).Hours() / 24
 				cell.Score = cell.Raw * Freshness(ageDays, spec.Service.Tier)
 				cell.State = stateFor(worst, openFO)
+				// Count as covered only if we actually proved or disproved something — an
+				// INCONCLUSIVE run (rendered "untested") taught us nothing, so it does not
+				// inflate coverage.
+				if cell.State != "untested" {
+					coverageTested++
+				}
 				if withinTau(ageDays, spec.Service.Tier) {
 					freshTested++
 				}

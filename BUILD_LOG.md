@@ -73,3 +73,21 @@ was done, what was verified, and anything deferred.
   raised on the critical packages (safety 84.6%, verify 84.6%, evidence 80.8%, score 93.1%);
   reconciled FR-17's CLI surface with reality.
 - Verified: `go test ./... -race` green; demo + evidence verify still reproduce every claim.
+
+### Round 2 ✅ (fresh reviewer; no Critical — R1 fixes held)
+- Verdict: no exploitable hole in any shipped path; the security-critical machinery is correct and
+  backed by meaningful tests. Three honesty/robustness moderates fixed:
+- **CLI errors were silently swallowed** (RunE errors printed nothing) — now `cli.Execute` prints a
+  clean `Error: …` line, so the serve-refusal remedy and evidence/catalog errors are visible again.
+- **Dead-man's-switch claim softened** to match reality: the forced-revert-on-failed-revert is wired
+  and tested; the autonomous silence-revert is tested library code, enforced on live infra by the
+  operator (README + safety-model + ROADMAP aligned).
+- **Egress guard made DNS-rebinding-safe**: resolve once, dial the vetted IP literal (no second
+  resolution), added RFC6598 CGNAT; extended the test (IPv6 loopback, unspecified, RFC1918, CGNAT).
+- Minors: `actionOf` returns "" when no action (consistent with the governor); INCONCLUSIVE no longer
+  counts toward coverage; `catalog validate` detects duplicate names; added the empty-caller-target
+  capability regression test; reconciled the prod-ring approvals doc with the code.
+- Also (user request): containerized (Dockerfile → distroless, K8s manifests, GoReleaser + GHCR
+  release workflow, ROADMAP) so it runs on any VM/cloud/cluster; added the Security Chaos Engineering
+  explainer to the README + landing page.
+- Verified: `go test ./... -race` green; demo/evidence/catalog/loopback-serve all reproduce.

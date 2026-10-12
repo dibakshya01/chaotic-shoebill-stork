@@ -13,11 +13,18 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// Execute runs the shoebill CLI with the given args.
+// Execute runs the shoebill CLI with the given args. The root command silences cobra's
+// own error printing (SilenceErrors) so we can render a single clean line here — without
+// this, RunE errors (e.g. the serve loopback refusal, a failed evidence verify) would
+// exit non-zero with no message at all.
 func Execute(ctx context.Context, args []string) error {
 	root := newRootCmd(os.Stdout, os.Stderr)
 	root.SetArgs(args)
-	return root.ExecuteContext(ctx)
+	if err := root.ExecuteContext(ctx); err != nil {
+		fmt.Fprintln(os.Stderr, "Error:", err)
+		return err
+	}
+	return nil
 }
 
 func newRootCmd(stdout, stderr io.Writer) *cobra.Command {

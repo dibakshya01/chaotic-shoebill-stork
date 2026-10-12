@@ -32,6 +32,17 @@ func registerCatalogCmd(root *cobra.Command, stdout, stderr io.Writer) {
 				return err
 			}
 			total, bad := 0, 0
+			// Duplicate experiment names would silently shadow each other.
+			nameCount := map[string]int{}
+			for _, e := range exps {
+				nameCount[e.Meta.Name]++
+			}
+			for name, n := range nameCount {
+				if n > 1 {
+					bad++
+					fmt.Fprintf(stderr, "%s✗ duplicate experiment name %q (%d files)%s\n", cRed, name, n, cReset)
+				}
+			}
 			for _, e := range exps {
 				total++
 				if errs := catalog.Validate(e); len(errs) > 0 {

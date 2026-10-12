@@ -142,8 +142,9 @@ safer, or more trustworthy**, it's out of scope.
 - **One door to injection.** The [Safety Governor](docs/safety-model.md) is the *only* path.
   Nothing detonates without an `Allowed` decision, and each detonator verifies a **governor-minted,
   Ed25519-signed, scoped, time-boxed capability** before it acts — a structural gate, not a
-  convention. The platform is architecturally incapable of causing an incident by being down (a
-  **dead-man's switch** reverts the fault if the control plane goes silent).
+  convention. A **dead-man's switch** forces a revert if a revert fails; its autonomous
+  silence-detector (revert the fault if the control plane goes quiet) is unit-tested and is the
+  operator agent's job on a live cluster (see [roadmap](ROADMAP.md)).
 - **It never lies.** `FAIL_OPEN` is its own verdict and dominates everything. `INCONCLUSIVE` *never*
   becomes `PASS` — if we couldn't observe, we learned nothing. An expected-but-**untested** control
   scores **0.0**, not "unknown".

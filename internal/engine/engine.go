@@ -310,11 +310,15 @@ func titleFor(exp model.Experiment, v model.Verdict) string {
 	}
 }
 
+// actionOf returns the experiment's declared injection action, or "" when none is
+// declared. It must mirror the governor, which only mints an "action:<x>" capability
+// scope for a non-empty action — returning the detonator name here instead would make an
+// action-less experiment fail its own action-scope check.
 func actionOf(exp model.Experiment) string {
 	if a, ok := exp.Injection.Spec["action"].(string); ok {
 		return a
 	}
-	return exp.Injection.Detonator
+	return ""
 }
 
 func capUUID(dec safety.Decision) string {

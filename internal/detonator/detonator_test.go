@@ -161,8 +161,16 @@ func TestHTTPDetonatorEgressGuard(t *testing.T) {
 	if _, err := guarded.Detonate(context.Background(), Spec{Target: target, Params: map[string]any{"url": "ftp://example.com"}}, cap); err == nil {
 		t.Fatal("non-http scheme must be refused")
 	}
-	// A link-local / metadata address is refused.
-	if _, err := guarded.Detonate(context.Background(), Spec{Target: target, Params: map[string]any{"url": "http://169.254.169.254/latest/meta-data/"}}, cap); err == nil {
-		t.Fatal("link-local metadata address must be blocked")
+	// Blocked literal IPs across the ranges the guard covers.
+	for _, u := range []string{
+		"http://169.254.169.254/latest/meta-data/", // link-local metadata
+		"http://[::1]:80/",                         // IPv6 loopback
+		"http://0.0.0.0:80/",                       // unspecified
+		"http://10.0.0.5/",                         // RFC1918 private
+		"http://100.64.0.1/",                       // RFC6598 CGNAT
+	} {
+		if _, err := guarded.Detonate(context.Background(), Spec{Target: target, Params: map[string]any{"url": u}}, cap); err == nil {
+			t.Fatalf("egress guard must block %s", u)
+		}
 	}
 }

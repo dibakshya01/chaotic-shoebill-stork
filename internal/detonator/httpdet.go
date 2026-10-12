@@ -62,40 +62,55 @@ func (h *HTTP) newClient() *http.Client {
 			return errors.New("http detonator does not follow redirects")
 		},
 		Transport: &http.Transport{
+			// Resolve ONCE, reject if any resolved IP is blocked, then dial the vetted IP
+			// literal — not the hostname — so a rebinding DNS cannot swap in a private/
+			// metadata IP between the check and the connect (TOCTOU-safe).
 			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-				if !h.allowPrivate {
-					if err := guardAddr(ctx, addr); err != nil {
-						return nil, err
+				if h.allowPrivate {
+					return dialer.DialContext(ctx, network, addr)
+				}
+				host, port, err := net.SplitHostPort(addr)
+				if err != nil {
+					return nil, err
+				}
+				if ip := net.ParseIP(host); ip != nil {
+					if isBlockedIP(ip) {
+						return nil, blockedEgress(host, ip)
+					}
+					return dialer.DialContext(ctx, network, addr)
+				}
+				ips, err := net.DefaultResolver.LookupIPAddr(ctx, host)
+				if err != nil {
+					return nil, err
+				}
+				if len(ips) == 0 {
+					return nil, fmt.Errorf("no addresses for %s", host)
+				}
+				for _, ipa := range ips {
+					if isBlockedIP(ipa.IP) {
+						return nil, blockedEgress(host, ipa.IP)
 					}
 				}
-				return dialer.DialContext(ctx, network, addr)
+				return dialer.DialContext(ctx, network, net.JoinHostPort(ips[0].IP.String(), port))
 			},
 		},
 	}
 }
 
-// guardAddr resolves addr and rejects any private/loopback/link-local/unspecified IP,
-// checked at dial time (mitigates DNS-rebinding).
-func guardAddr(ctx context.Context, addr string) error {
-	host, _, err := net.SplitHostPort(addr)
-	if err != nil {
-		return err
-	}
-	ips, err := net.DefaultResolver.LookupIPAddr(ctx, host)
-	if err != nil {
-		return err
-	}
-	for _, ip := range ips {
-		if isBlockedIP(ip.IP) {
-			return fmt.Errorf("egress to %s (%s) blocked: loopback/link-local/private/unspecified", host, ip.IP)
-		}
-	}
-	return nil
+func blockedEgress(host string, ip net.IP) error {
+	return fmt.Errorf("egress to %s (%s) blocked: loopback/link-local/private/CGNAT/unspecified", host, ip)
 }
 
 func isBlockedIP(ip net.IP) bool {
-	return ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() ||
-		ip.IsPrivate() || ip.IsUnspecified()
+	if ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() ||
+		ip.IsPrivate() || ip.IsUnspecified() {
+		return true
+	}
+	// RFC 6598 Carrier-Grade NAT: 100.64.0.0/10.
+	if v4 := ip.To4(); v4 != nil && v4[0] == 100 && v4[1] >= 64 && v4[1] <= 127 {
+		return true
+	}
+	return false
 }
 
 // Kind implements Detonator.

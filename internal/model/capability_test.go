@@ -92,6 +92,16 @@ func TestCapabilityTargetMismatch(t *testing.T) {
 	}
 }
 
+func TestCapabilityEmptyCallerTargetRefused(t *testing.T) {
+	pub, priv := testKeys(t)
+	now := time.Unix(1_700_000_000, 0).UTC()
+	c := validCap(t, priv, now) // target-scoped
+	// An empty caller target must be a mismatch, not a skip (the Round-1 bypass fix).
+	if err := c.Authorize(pub, now, "", "detonator:mock"); !errors.Is(err, ErrCapTarget) {
+		t.Fatalf("empty caller target must be refused for a target-scoped cap, got %v", err)
+	}
+}
+
 func TestCapabilityWildcardScope(t *testing.T) {
 	pub, priv := testKeys(t)
 	now := time.Unix(1_700_000_000, 0).UTC()

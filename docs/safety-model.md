@@ -53,20 +53,29 @@ a documented pluggable alternative). The envelope tightens with environment impa
 | `stage` | ∞ | ≤ 900s, ≤50% replicas | synthetic only | 1 |
 | `preprod` | ∞ | ≤ 300s, ≤20% replicas | replayed | 2 |
 | **`prod-canary`** | **1** | **≤ 60s, ≤5% replicas** | **≤ 1%** | **2 distinct teams** |
-| `prod-ring` | — | ≤ 60s, ≤5% replicas | ≤ 5% | standing grant |
+| `prod-ring` | — | ≤ 60s, ≤5% replicas | ≤ 5% | 2 distinct (+ standing capability grant) |
 
 A **payments-path** service in production may only run `observe_only` experiments — never injection.
 An inject-mode experiment that is not declared `reversible` is refused outright.
 
 ## The dead-man's switch
 
-The property that makes the whole platform safe to run at all: the agent arms a dead-man's switch
-when it injects. If the control plane stops heart-beating (default: 10s of silence) or the hard
-deadline (`duration + 20%`) passes, the fault is reverted **without the control plane** — it
-self-heals. This is why the platform cannot cause an incident by being down.
+A safety net that reverts an injection even when the control plane can't. It has two modes:
 
-> In v1 this is demonstrated against the in-process mock environment. The real-infrastructure agent
-> that enforces it on a live cluster lives in the [operator](../operator) module.
+- **Forced revert (wired in v1).** The engine arms the switch when it injects. If the engine's own
+  `Revert` fails, the switch fires a forced revert so the fault is still undone. This path is wired
+  into `engine.Run` and tested (a detonator whose first revert fails still ends reverted).
+- **Autonomous silence-revert (operator path).** If the control plane stops heart-beating (default:
+  10s of silence) or the hard deadline (`duration + 20%`) passes, the agent reverts the fault
+  **without the control plane**. The mechanism is implemented and unit-tested in `internal/agent`
+  (drive it with an advancing clock and it reverts with `control_plane_unreachable`), but it is only
+  *autonomously driven* on a live cluster by the [operator](../operator) agent — the in-process
+  engine runs the loop synchronously to completion, so there is no window for silence in v1.
+
+Together these are why, on the operator path, the platform cannot cause an incident by being down.
+In v1 the honest statement is narrower: the engine always reverts on completion and force-reverts on
+a failed revert; the autonomous self-heal is tested library code, enforced on live infra by the
+operator (see [ROADMAP](../ROADMAP.md)).
 
 ## Suppression safety
 
