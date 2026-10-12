@@ -1,0 +1,41 @@
+# Service registry — the scorecard's expected-control set. Every service declares a
+# tier (1=most critical/regulated, 2=important, 3=standard) and the control families it
+# is EXPECTED to pass. An expected-but-untested family scores 0.0 (untested != unknown).
+# In production this is backed by a real service catalog; here it is a sample.
+services:
+  - id: checkout
+    name: checkout
+    tier: 1
+    team: checkout
+    expected: [mesh, gateway, identity, data, detection]
+  - id: payments
+    name: payments
+    tier: 1
+    team: payments
+    onPaymentsPath: true
+    expected: [mesh, gateway, identity, data, detection]
+  - id: orders
+    name: orders
+    tier: 1
+    team: fulfilment
+    expected: [mesh, gateway, identity, network, detection]
+  - id: catalog
+    name: catalog
+    tier: 2
+    team: catalog
+    expected: [mesh, gateway, network, detection]
+  - id: search
+    name: search
+    tier: 2
+    team: search
+    expected: [mesh, gateway, network]
+  - id: profile
+    name: profile
+    tier: 2
+    team: profile
+    expected: [mesh, gateway, identity, data]
+  - id: recommendations
+    name: recommendations
+    tier: 3
+    team: ml-platform
+    expected: [mesh, gateway, ai]

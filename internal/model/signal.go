@@ -88,14 +88,14 @@ type Assertion struct {
 	Query  string       `json:"query" yaml:"query"`
 	Expect Expectation  `json:"expect" yaml:"expect"`
 	// SLOms is the maximum acceptable latency for this stage, in milliseconds.
-	SLOms int64 `json:"slo_ms" yaml:"slo_ms"`
+	SLOms int64 `json:"slo_ms" yaml:"sloMs"`
 	// RequireUUID defaults to true. When false, Justification MUST be non-empty:
 	// an assertion that is not UUID-scoped is a coincidence detector unless justified.
-	RequireUUID   *bool  `json:"require_uuid,omitempty" yaml:"require_uuid,omitempty"`
+	RequireUUID   *bool  `json:"require_uuid,omitempty" yaml:"requireUuid,omitempty"`
 	Justification string `json:"justification,omitempty" yaml:"justification,omitempty"`
 	// SecurityRelevant marks an assertion whose "absent" expectation, if matched,
 	// means the control permitted something it should not have (fail-open).
-	SecurityRelevant bool `json:"security_relevant,omitempty" yaml:"security_relevant,omitempty"`
+	SecurityRelevant bool `json:"security_relevant,omitempty" yaml:"securityRelevant,omitempty"`
 }
 
 // RequiresUUID reports the effective value (default true).

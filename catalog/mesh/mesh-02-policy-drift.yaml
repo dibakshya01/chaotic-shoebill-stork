@@ -1,0 +1,53 @@
+apiVersion: chaos.shoebill.dev/v1alpha1
+kind: SecurityChaosExperiment
+metadata:
+  name: mesh-02-policy-drift
+  version: 1
+  title: Mesh mTLS policy drift detection
+family: mesh
+blastRadiusClass: low
+description: >
+  A read-only drift check: mTLS mode is STRICT in every namespace holding a Tier-1
+  service, and the authorization policy set is identical across regions. observe_only —
+  always safe to run, even during a freeze window.
+controls: [mtls, peer-authentication, authorization-policy]
+attackIds: [T1557, T1040]
+owaspIds: [API8:2023]
+controlFamilies: [ISO-A.8.24, NIST-SC-8]
+hypothesis:
+  statement: >
+    No namespace holding a Tier-1 service is in PERMISSIVE mTLS mode, and the mesh
+    authorization policy set is byte-identical across regions.
+  steadyState:
+    - source: prometheus
+      query: 'mesh_peer_authentication_permissive_total > 0'
+      expect: {type: absent}
+injection:
+  detonator: observe
+  mode: observe_only
+  spec:
+    action: policy-diff
+assertions:
+  - stage: PREVENTED
+    source: prometheus
+    query: 'mesh_peer_authentication_permissive{tier="1"}'
+    expect: {type: absent}
+    sloMs: 0
+    requireUuid: false
+    justification: >
+      A drift assertion over the whole policy surface; there is no injected run to
+      correlate a UUID against (observe_only).
+    securityRelevant: true
+  - stage: DETECTED
+    source: prometheus
+    query: 'mesh_policy_replication_lag_seconds'
+    expect: {type: threshold, op: lt, value: 60}
+    sloMs: 60000
+blastRadius:
+  maxPods: 0
+  maxPctReplicas: 0
+  maxDurationSeconds: 0
+  maxTrafficPct: 0
+promotion:
+  requiresPassIn: []
+  withinDays: 14

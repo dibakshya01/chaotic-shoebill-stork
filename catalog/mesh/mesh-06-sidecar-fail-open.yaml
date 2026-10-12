@@ -1,0 +1,80 @@
+apiVersion: chaos.shoebill.dev/v1alpha1
+kind: SecurityChaosExperiment
+metadata:
+  name: mesh-06-sidecar-fail-open
+  version: 1
+  title: Mesh authorization under sidecar failure
+family: mesh
+blastRadiusClass: high
+description: >
+  Verifies that a meshed service fails CLOSED when its sidecar proxy cannot evaluate
+  authorization policy. A service that keeps serving traffic unauthenticated under
+  sidecar failure is a critical FAIL_OPEN — the single highest-value class of finding.
+controls: [service-mesh-authz, mtls, sidecar-proxy]
+attackIds: [T1562.001, T1078]
+owaspIds: [API5:2023]
+controlFamilies: [ISO-A.8.5, PCI-DSS-7, NIST-AC-3]
+hypothesis:
+  statement: >
+    When the sidecar proxy of {{.target}} cannot evaluate policy, all inbound requests
+    are denied; no request is served without a valid authorization decision.
+  steadyState:
+    - source: prometheus
+      query: 'sum(rate(mesh_requests_total{service="{{.target}}",code!~"5.."}[2m])) > 0'
+      expect: {type: threshold, op: gt, value: 0}
+    - source: prometheus
+      query: 'mesh_authz_denied_total{service="{{.target}}"}'
+      expect: {type: present}
+injection:
+  detonator: k8s
+  mode: inject
+  spec:
+    action: container-kill
+    container: sidecar-proxy
+    podCount: 1
+  duration: 45s
+  reversible: true
+  revertVerification:
+    source: prometheus
+    query: 'up{job="sidecar",service="{{.target}}"}'
+    expect: {type: threshold, op: eq, value: 1}
+assertions:
+  - stage: PREVENTED
+    source: gwlog
+    query: 'service="{{.target}}" AND code=200 AND NOT has_field("authz_decision")'
+    expect: {type: absent}
+    sloMs: 0
+    requireUuid: false
+    justification: >
+      Asserts the ABSENCE of unauthenticated success across all traffic to the injected
+      pod during the window; UUID scoping would narrow it to synthetic traffic only and
+      miss real fail-open behaviour.
+    securityRelevant: true
+  - stage: DETECTED
+    source: prometheus
+    query: 'increase(sidecar_unhealthy_total{service="{{.target}}"}[2m])'
+    expect: {type: threshold, op: gt, value: 0}
+    sloMs: 60000
+  - stage: ALERTED
+    source: alertmanager
+    query: SidecarUnhealthy
+    expect: {type: present}
+    sloMs: 300000
+  - stage: PAGED
+    source: alertmanager
+    query: SidecarUnhealthy
+    expect: {type: paged}
+    sloMs: 600000
+blastRadius:
+  maxPods: 1
+  maxPctReplicas: 5
+  maxDurationSeconds: 60
+  maxTrafficPct: 1
+  requiresDistinctFaultDomains: true
+expectedNoise:
+  - PodContainerRestart
+  - SidecarRestartRate
+promotion:
+  requiresPassIn: [playground, stage, preprod]
+  withinDays: 14
+capabilities: [mesh-injection, prod-injection]

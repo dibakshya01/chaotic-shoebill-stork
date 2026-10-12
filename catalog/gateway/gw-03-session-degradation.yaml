@@ -1,0 +1,73 @@
+apiVersion: chaos.shoebill.dev/v1alpha1
+kind: SecurityChaosExperiment
+metadata:
+  name: gw-03-session-degradation-fail-open
+  version: 1
+  title: Auth bypass on session-service degradation
+family: gateway
+blastRadiusClass: high
+description: >
+  Verifies that the API gateway DENIES when the session-validation service cannot
+  validate a session. Reusing a cached session decision beyond its TTL — serving a
+  request bearing a revoked session with 200 — is a critical FAIL_OPEN.
+controls: [api-gateway-authn, session-service]
+attackIds: [T1078, T1550.001]
+owaspIds: [API2:2023]
+controlFamilies: [PCI-DSS-8.2, ISO-A.8.5, SOC2-CC6.1]
+hypothesis:
+  statement: >
+    When the session service is unavailable to the {{.target}} canary, requests bearing
+    a REVOKED session receive 401. Zero revoked-session requests receive 200.
+  steadyState:
+    - source: http
+      query: 'GET https://{{.target}}/internal/health'
+      expect: {type: value, op: eq, value: 200}
+    - source: prometheus
+      query: 'sum(rate(gateway_requests_total{service="{{.target}}",code="401"}[5m])) >= 0'
+      expect: {type: threshold, op: gte, value: 0}
+injection:
+  detonator: k8s
+  mode: inject
+  spec:
+    action: dependency-blackhole
+    dependency: session-service
+    podCount: 1
+  duration: 60s
+  reversible: true
+  revertVerification:
+    source: prometheus
+    query: 'up{job="session-service"}'
+    expect: {type: threshold, op: eq, value: 1}
+assertions:
+  - stage: PREVENTED
+    source: gwlog
+    query: 'service="{{.target}}" AND session_state="revoked" AND code=200'
+    expect: {type: absent}
+    sloMs: 0
+    requireUuid: false
+    justification: >
+      Fail-open is asserted over all revoked-session traffic during the window, not only
+      synthetic requests, so UUID scoping is intentionally not required here.
+    securityRelevant: true
+  - stage: DETECTED
+    source: prometheus
+    query: 'increase(session_validation_failures_total{service="{{.target}}"}[2m])'
+    expect: {type: threshold, op: gt, value: 0}
+    sloMs: 60000
+  - stage: ALERTED
+    source: alertmanager
+    query: SessionServiceUnreachable
+    expect: {type: present}
+    sloMs: 300000
+blastRadius:
+  maxPods: 1
+  maxPctReplicas: 5
+  maxDurationSeconds: 60
+  maxTrafficPct: 1
+  requiresDistinctFaultDomains: true
+expectedNoise:
+  - GatewayUpstreamErrors
+promotion:
+  requiresPassIn: [playground, stage, preprod]
+  withinDays: 14
+capabilities: [gateway-injection, prod-injection]
