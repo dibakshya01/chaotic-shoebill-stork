@@ -69,12 +69,18 @@ go test ./...                  # fake-client reconcile + detonator + converter t
 controller-gen object paths=./api/...
 controller-gen crd:allowDangerousTypes=true paths=./api/... output:crd:dir=config/crd
 
-# build the image (from the repo root so the replace to the core module resolves):
+# build the image locally (from the repo root so the replace to the core module resolves):
 docker build -f operator/Dockerfile -t ghcr.io/dibakshya01/shoebill-operator:dev .
 
 # deploy to a cluster:
 kubectl apply -k operator/config/
 ```
+
+Tagged releases publish a multi-arch, **cosign-signed** operator image to
+`ghcr.io/dibakshya01/shoebill-operator` (same release workflow as the core `shoebill`
+image); the Deployment in `config/manager.yaml` references `:latest`, so a fresh
+`kubectl apply -k` pulls a published image without a local build. CI builds, vets, and
+race-tests this module on every push and PR.
 
 Then create a `SecurityChaosExperiment` + a `SecurityChaosRun` (see the catalog for
 experiment shapes) and watch `kubectl get securitychaosruns -o wide`.

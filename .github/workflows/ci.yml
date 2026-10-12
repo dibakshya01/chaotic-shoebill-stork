@@ -52,3 +52,29 @@ jobs:
         run: |
           ./bin/shoebill demo --dir .shoebill
           ./bin/shoebill evidence verify --dir .shoebill/evidence --key .shoebill/evidence.key.pub
+
+  operator:
+    name: operator · build · vet · test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+          cache-dependency-path: operator/go.sum
+
+      # Separate Go module (its own go.mod) so the core build stays dependency-light.
+      # The `replace` directive points it at the checked-out core module in the parent dir.
+      - name: build
+        working-directory: operator
+        run: go build ./...
+
+      - name: go vet
+        working-directory: operator
+        run: go vet ./...
+
+      - name: test
+        working-directory: operator
+        run: go test ./... -race -count=1

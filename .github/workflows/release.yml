@@ -63,3 +63,43 @@ jobs:
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
         run: cosign sign --yes "ghcr.io/${{ github.repository_owner }}/shoebill@${DIGEST}"
+
+  operator-container:
+    name: operator image (GHCR, cosign-signed)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write        # push to GHCR
+      id-token: write         # keyless cosign signing (OIDC)
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: sigstore/cosign-installer@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/shoebill-operator
+          tags: |
+            type=semver,pattern={{version}}
+            type=raw,value=latest
+      # Built from the repo root (context: .) so the operator's `replace => ../` to the
+      # core module resolves; the Dockerfile lives under operator/.
+      - id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: operator/Dockerfile
+          push: true
+          platforms: linux/amd64,linux/arm64
+          build-args: VERSION=${{ github.ref_name }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+      - name: Sign the operator image with cosign
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: cosign sign --yes "ghcr.io/${{ github.repository_owner }}/shoebill-operator@${DIGEST}"
