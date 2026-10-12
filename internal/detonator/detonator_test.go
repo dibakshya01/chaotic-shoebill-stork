@@ -21,7 +21,7 @@ func validCap(t *testing.T, priv ed25519.PrivateKey, kind string) model.Capabili
 	t.Helper()
 	c := model.Capability{
 		ID: "cap", RunUUID: "run-uuid-123", Target: target,
-		Scopes:    []string{"detonator:" + kind, "env:stage"},
+		Scopes:    []string{"detonator:" + kind, "env:stage", "action:*"},
 		IssuedAt:  now().Add(-time.Second),
 		ExpiresAt: now().Add(time.Minute),
 	}
@@ -48,7 +48,9 @@ func contractDetonators(t *testing.T, pub ed25519.PublicKey) []struct {
 	}{
 		{NewMock(env, pub, now), Spec{Target: target, Action: "container-kill"}},
 		{NewObserve(pub, now), Spec{Target: target}},
-		{NewHTTP(pub, now), Spec{Target: target, Params: map[string]any{"url": srv.URL}}},
+		// WithAllowPrivateEgress: the test server is loopback; the egress guard is
+		// exercised separately in TestHTTPDetonatorEgressGuard.
+		{NewHTTP(pub, now, WithAllowPrivateEgress()), Spec{Target: target, Params: map[string]any{"url": srv.URL}}},
 	}
 }
 
@@ -115,5 +117,52 @@ func TestDetonatorContract(t *testing.T) {
 				t.Errorf("%s: VerifyReverted returned false after revert", kind)
 			}
 		})
+	}
+}
+
+func TestActionScopeEnforced(t *testing.T) {
+	pub, priv, _ := ed25519.GenerateKey(nil)
+	env := sim.New()
+	d := NewMock(env, pub, now)
+	// Capability authorizes the mock detonator but only the "container-kill" action.
+	c := model.Capability{
+		ID: "cap", RunUUID: "u", Target: target,
+		Scopes:   []string{"detonator:mock", "action:container-kill"},
+		IssuedAt: now().Add(-time.Second), ExpiresAt: now().Add(time.Minute),
+	}
+	if err := c.Sign("gov", priv); err != nil {
+		t.Fatal(err)
+	}
+	// A spec with a DIFFERENT action must be refused — the action scope is load-bearing.
+	if _, err := d.Detonate(context.Background(), Spec{Target: target, Action: "delete-everything"}, c); err == nil {
+		t.Fatal("expected refusal: capability does not authorize action 'delete-everything'")
+	}
+	if env.Active() {
+		t.Fatal("must not inject when the action is out of scope")
+	}
+	// The authorized action succeeds.
+	if _, err := d.Detonate(context.Background(), Spec{Target: target, Action: "container-kill"}, c); err != nil {
+		t.Fatalf("authorized action should succeed: %v", err)
+	}
+}
+
+func TestHTTPDetonatorEgressGuard(t *testing.T) {
+	pub, priv, _ := ed25519.GenerateKey(nil)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {}))
+	defer srv.Close()
+	cap := validCap(t, priv, "http")
+
+	// Guarded (default) http detonator must refuse egress to the loopback test server.
+	guarded := NewHTTP(pub, now)
+	if _, err := guarded.Detonate(context.Background(), Spec{Target: target, Params: map[string]any{"url": srv.URL}}, cap); err == nil {
+		t.Fatal("egress guard must block the loopback address")
+	}
+	// A non-http scheme is refused up front.
+	if _, err := guarded.Detonate(context.Background(), Spec{Target: target, Params: map[string]any{"url": "ftp://example.com"}}, cap); err == nil {
+		t.Fatal("non-http scheme must be refused")
+	}
+	// A link-local / metadata address is refused.
+	if _, err := guarded.Detonate(context.Background(), Spec{Target: target, Params: map[string]any{"url": "http://169.254.169.254/latest/meta-data/"}}, cap); err == nil {
+		t.Fatal("link-local metadata address must be blocked")
 	}
 }

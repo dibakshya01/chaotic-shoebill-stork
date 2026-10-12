@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/dibakshya01/chaotic-shoebill-stork/internal/agent"
 	"github.com/dibakshya01/chaotic-shoebill-stork/internal/detonator"
 	"github.com/dibakshya01/chaotic-shoebill-stork/internal/evidence"
 	"github.com/dibakshya01/chaotic-shoebill-stork/internal/findings"
@@ -110,19 +111,38 @@ func (e *Engine) Run(ctx context.Context, exp model.Experiment, run model.Run, g
 		{TS: started, Phase: model.PhaseArmed, Detail: "capability " + cap.ID + " issued"},
 	}
 
+	// 3. ARM — register expected-noise suppression (validated: it can never cover an
+	// asserted alert, and its TTL is capped at 30m).
+	suppressions := e.registerSuppression(runID, exp, started, &timeline)
+
 	// 4. DETONATE — the single guarded call.
 	aborted := false
-	abortReason := ""
 	if _, derr := det.Detonate(ctx, spec, cap); derr != nil {
 		aborted = true
-		abortReason = derr.Error()
-		timeline = append(timeline, evidence.Event{TS: e.now(), Phase: model.PhaseAborted, Detail: abortReason})
+		timeline = append(timeline, evidence.Event{TS: e.now(), Phase: model.PhaseAborted, Detail: derr.Error()})
 	} else {
 		timeline = append(timeline, evidence.Event{TS: e.now(), Phase: model.PhaseInjected, Detail: spec.Action})
 	}
 
+	// Arm the dead-man's switch: a safety net that reverts the injection WITHOUT the
+	// control plane if the control plane goes silent or the hard deadline passes
+	// (internal/agent). On a live cluster the agent runs independently of the control
+	// plane; in-process it is disarmed on a clean revert and fires a forced revert if
+	// our own revert fails.
+	var dms *agent.DeadMansSwitch
+	if !aborted {
+		dms = agent.New(started, time.Duration(exp.Injection.Duration), e.hbTimeout, func(string) {
+			_ = det.Revert(context.Background(), spec, cap)
+		})
+		dms.Heartbeat(e.now())
+		timeline = append(timeline, evidence.Event{TS: e.now(), Phase: model.PhaseArmed, Detail: "dead-man's switch armed"})
+	}
+
 	// 5. OBSERVE.
 	ladder, verdict, failOpenObserved := e.verifier.Verify(ctx, exp, cap.RunUUID, aborted)
+	if dms != nil {
+		dms.Heartbeat(e.now())
+	}
 	timeline = append(timeline, evidence.Event{TS: e.now(), Phase: model.PhaseObserving})
 
 	// 6. REVERT — idempotent, independently verified.
@@ -134,11 +154,22 @@ func (e *Engine) Run(ctx context.Context, exp model.Experiment, run model.Run, g
 	} else {
 		reverted = false
 	}
+	if dms != nil {
+		if reverted {
+			dms.Disarm() // clean revert — stand down the safety net
+		} else {
+			// our revert failed — the dead-man's switch fires a forced revert.
+			dms.Fire("revert_failed")
+			timeline = append(timeline, evidence.Event{TS: e.now(), Phase: model.PhaseReverting,
+				Detail: "dead-man's switch fired a forced revert after a failed revert"})
+		}
+	}
 	timeline = append(timeline, evidence.Event{TS: e.now(), Phase: model.PhaseReverting,
 		Detail: fmt.Sprintf("reverted=%v", reverted)})
 
 	// 7. ADJUDICATE -> receipt -> score -> finding.
 	receipt := e.buildReceipt(runID, exp, run, dec, ladder, verdict, timeline)
+	receipt.Governance.Suppressions = suppressions
 	if err := e.ledger.Append(receipt); err != nil {
 		return Result{}, fmt.Errorf("append evidence: %w", err)
 	}
@@ -161,6 +192,34 @@ func (e *Engine) Run(ctx context.Context, exp model.Experiment, run model.Run, g
 		Decision: dec, RunID: runID, Verdict: verdict, Ladder: ladder,
 		Receipt: receipt, Finding: finding, Reverted: reverted,
 	}, nil
+}
+
+// registerSuppression validates and records the experiment's expected-noise alert
+// suppression (ValidateSuppression guarantees it never covers an asserted alert and the
+// TTL is capped at 30m). Returns the suppression entries for the receipt.
+func (e *Engine) registerSuppression(runID string, exp model.Experiment, at time.Time, timeline *[]evidence.Event) []evidence.Suppression {
+	if len(exp.ExpectedNoise) == 0 {
+		return nil
+	}
+	dur := time.Duration(exp.Injection.Duration)
+	ttl := dur + dur/5 + 30*time.Second
+	if ttl > safety.MaxSuppressionTTL {
+		ttl = safety.MaxSuppressionTTL
+	}
+	req := safety.SuppressionRequest{RunID: runID, AlertRules: exp.ExpectedNoise, TTL: ttl}
+	if err := safety.ValidateSuppression(req, exp); err != nil {
+		// The catalog validator should prevent this; record the refusal and suppress nothing.
+		*timeline = append(*timeline, evidence.Event{TS: at, Phase: model.PhaseArmed, Detail: "suppression refused: " + err.Error()})
+		return nil
+	}
+	expiry := at.Add(ttl)
+	out := make([]evidence.Suppression, 0, len(exp.ExpectedNoise))
+	for _, rule := range exp.ExpectedNoise {
+		out = append(out, evidence.Suppression{Rule: rule, TTLSeconds: int(ttl.Seconds()), ExpiredAt: &expiry})
+	}
+	*timeline = append(*timeline, evidence.Event{TS: at, Phase: model.PhaseArmed,
+		Detail: fmt.Sprintf("registered %d expected-noise suppression(s), ttl %s", len(out), ttl)})
+	return out
 }
 
 func (e *Engine) buildReceipt(runID string, exp model.Experiment, run model.Run, dec safety.Decision, ladder model.Ladder, verdict model.Verdict, timeline []evidence.Event) *evidence.Receipt {

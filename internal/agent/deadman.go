@@ -61,6 +61,36 @@ func (d *DeadMansSwitch) Fired() (bool, string) {
 	return d.fired, d.reason
 }
 
+// Disarm stops the switch WITHOUT reverting — the control plane calls it after it has
+// cleanly reverted the injection itself, so neither Check nor the Run loop's
+// context-cancel path fires a second (spurious) revert.
+func (d *DeadMansSwitch) Disarm() {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if !d.fired {
+		d.fired = true
+		d.reason = "disarmed"
+	}
+}
+
+// Fire invokes the revert callback once (idempotent) with the given reason. The control
+// plane calls it to force a revert when its own revert failed — a synchronous safety net
+// that does not depend on the background Run loop.
+func (d *DeadMansSwitch) Fire(reason string) {
+	d.mu.Lock()
+	if d.fired {
+		d.mu.Unlock()
+		return
+	}
+	d.fired = true
+	d.reason = reason
+	revert := d.revert
+	d.mu.Unlock()
+	if revert != nil {
+		revert(reason)
+	}
+}
+
 // Check evaluates the switch at time now, reverting if the heartbeat is stale or the
 // hard deadline passed. It is idempotent (fires at most once). Returns true once fired.
 func (d *DeadMansSwitch) Check(now time.Time) bool {

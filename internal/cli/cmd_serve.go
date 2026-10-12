@@ -87,7 +87,9 @@ func registerServeCmd(root *cobra.Command, stdout, stderr io.Writer) {
 }
 
 func isLoopback(host string) bool {
-	if host == "" || host == "localhost" {
+	// An empty host binds to 0.0.0.0 / [::] (all interfaces), so it is NOT loopback —
+	// `--addr :PORT` must require --insecure-remote, same as an explicit 0.0.0.0.
+	if host == "localhost" {
 		return true
 	}
 	ip := net.ParseIP(host)

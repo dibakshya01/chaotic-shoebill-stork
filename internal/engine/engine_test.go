@@ -3,7 +3,9 @@ package engine
 import (
 	"context"
 	"crypto/ed25519"
+	"fmt"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -144,6 +146,100 @@ func TestEngineRefusesWithoutDetonating(t *testing.T) {
 	rep, _ := evidence.VerifyLedger(dir, evidence.NewVerifier(map[string]ed25519.PublicKey{"k": pub}))
 	if rep.Count != 0 {
 		t.Fatalf("no receipt should be written on refusal, got %d", rep.Count)
+	}
+}
+
+func TestEngineArmsDeadManAndRegistersSuppression(t *testing.T) {
+	env := sim.New()
+	env.ProgramSteady("up", sim.Response{Found: true})
+	env.ProgramDuring("unauth_success", sim.Response{Found: false}) // control holds
+	exp := failOpenExperiment()
+	exp.ExpectedNoise = []string{"ProxyRestartRate"} // not an asserted alert rule
+	eng, _, _ := wire(t, env, false)
+	res, err := eng.Run(context.Background(), exp, stageRun(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The engine must ARM the dead-man's switch and record it (C1 fix).
+	armed := false
+	for _, ev := range res.Receipt.Timeline {
+		if strings.Contains(ev.Detail, "dead-man's switch armed") {
+			armed = true
+		}
+	}
+	if !armed {
+		t.Fatal("engine must arm the dead-man's switch and record it in the receipt timeline")
+	}
+	// The engine must REGISTER the expected-noise suppression (C1 fix), capped at 30m.
+	sup := res.Receipt.Governance.Suppressions
+	if len(sup) != 1 || sup[0].Rule != "ProxyRestartRate" {
+		t.Fatalf("expected the expected-noise suppression recorded, got %+v", sup)
+	}
+	if sup[0].TTLSeconds > int((30 * time.Minute).Seconds()) {
+		t.Fatalf("suppression TTL must be capped at 30m, got %ds", sup[0].TTLSeconds)
+	}
+}
+
+// flakyRevert fails its first N Revert calls, to exercise the dead-man's-switch
+// forced-revert path.
+type flakyRevert struct {
+	*detonator.Mock
+	failUntil int
+	calls     int
+}
+
+func (f *flakyRevert) Revert(ctx context.Context, spec detonator.Spec, cap model.Capability) error {
+	f.calls++
+	if f.calls <= f.failUntil {
+		return fmt.Errorf("transient revert failure #%d", f.calls)
+	}
+	return f.Mock.Revert(ctx, spec, cap)
+}
+
+func TestEngineDeadManForcesRevertWhenRevertFails(t *testing.T) {
+	env := sim.New()
+	env.ProgramSteady("up", sim.Response{Found: true})
+	env.ProgramDuring("unauth_success", sim.Response{Found: false})
+
+	_, priv, _ := ed25519.GenerateKey(nil)
+	reg := sources.Registry{model.SourceMock: sources.NewMock(env, model.SourceMock)}
+	promo := &safety.MapPromotionHistory{}
+	promo.Record("fo-exp", model.EnvPlayground, tnow.Add(-24*time.Hour))
+	providers := safety.Providers{
+		KillSwitch: safety.StaticKillSwitch{}, Incidents: safety.NoIncidents{}, Blackout: safety.StaticBlackout{},
+		Promotions: promo, Concurrency: safety.FreeConcurrency{Max: 5}, FaultDomains: safety.NoFaultDomainClash{},
+		SteadyState: prober.New(reg),
+	}
+	gov := safety.NewGovernor(providers, "k", priv, safety.WithClock(clk), safety.WithIDGen(ids()))
+	// Register a detonator whose first Revert fails.
+	flaky := &flakyRevert{Mock: detonator.NewMock(env, gov.PublicKey(), clk), failUntil: 1}
+	dets := detonator.Registry{"mock": flaky}
+	ledger, _ := evidence.OpenLedger(filepath.Join(t.TempDir(), "ev"), evidence.NewSigner("k", priv, evidence.WithClock(clk)))
+	eng := New(gov, dets, verify.NewEngine(reg, clk), ledger, store.New(), Options{Now: clk, NewID: ids()})
+
+	res, err := eng.Run(context.Background(), failOpenExperiment(), stageRun(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Our own revert failed...
+	if res.Reverted {
+		t.Fatal("precondition: the first revert should have failed")
+	}
+	// ...but the dead-man's switch fired a forced revert, so the fault is undone anyway.
+	if !env.Reverted() {
+		t.Fatal("the dead-man's switch must force a revert when our revert fails")
+	}
+	fired := false
+	for _, ev := range res.Receipt.Timeline {
+		if strings.Contains(ev.Detail, "dead-man's switch fired") {
+			fired = true
+		}
+	}
+	if !fired {
+		t.Fatal("the forced revert must be recorded in the receipt")
+	}
+	if flaky.calls < 2 {
+		t.Fatalf("expected the dead-man's switch to retry the revert, calls=%d", flaky.calls)
 	}
 }
 

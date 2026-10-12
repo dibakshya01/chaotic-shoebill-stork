@@ -47,10 +47,15 @@ func (h *HTTP) Query(ctx context.Context, query, uuid string) (Observation, erro
 		return Observation{}, fmt.Errorf("http probe %s %s: %w", method, target, err)
 	}
 	defer resp.Body.Close()
+	// Correlation note: unlike the prometheus/alertmanager sources (which search for the
+	// uuid in an asynchronously-emitted signal), an HTTP probe is SYNCHRONOUS — this
+	// response is, by construction, the response to the request we just made carrying
+	// this run's correlation header. So MatchedUUID reflects that direct causality, not a
+	// coincidence. (Use an async source for assertions where coincidence is a real risk.)
 	return Observation{
 		Found:       true,
 		Value:       float64(resp.StatusCode),
 		Count:       1,
-		MatchedUUID: uuid != "", // the probe itself carried the correlation header
+		MatchedUUID: uuid != "",
 	}, nil
 }

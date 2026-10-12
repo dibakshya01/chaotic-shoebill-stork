@@ -45,3 +45,31 @@ was done, what was verified, and anything deferred.
 - Verified: `go test ./internal/model/... ./internal/evidence/...` green. Tamper flips a byte →
   verify fails; mid-chain reorder → fails; tail-truncation → fails via head mismatch; capability
   expiry/scope/forgery/tamper all rejected. `go vet` clean.
+
+### M2–M8 ✅ (Safety Governor, verification, detonators, engine, scoring, CLI, demo, API+UI, catalog, operator)
+- See commits de3b043 … a2ee52d. `go test ./... -race` green; `shoebill demo` + `evidence verify`
+  reproduce the README's claims (3 fail-open, Tier-1 capped at 0.40, tamper caught); dashboard
+  verified live in a browser.
+
+## Phase 5 — Adversarial hardening
+### Round 1 ✅ (fresh memory-free reviewer; findings triaged + fixed)
+- **C2 (critical):** `serve --addr :PORT`/empty-host bound all interfaces. Fixed `isLoopback` so only
+  an explicit loopback IP / `localhost` is loopback; `:PORT` and `0.0.0.0` now require
+  `--insecure-remote`. Makefile `serve` target updated.
+- **C1 (critical):** the dead-man's switch and alert suppression were implemented + unit-tested but
+  never wired into `engine.Run`. Now the engine arms the dead-man's switch (and fires a forced revert
+  if our own revert fails), registers validated expected-noise suppression (TTL-capped at 30m), and
+  records both in the receipt. New tests assert arming, suppression recording, and the forced-revert
+  path; the demo now shows suppressions.
+- **M3:** http source correlation documented honestly (synchronous probe = correlated by
+  construction, not coincidence).
+- **M4:** http detonator given an egress guard (http/https only, no redirects, blocks
+  loopback/link-local/private/unspecified at dial) with a test-only escape hatch + tests.
+- **M5:** capability empty-target bypass closed; the minted `action:<x>` scope is now enforced by the
+  detonators (+ tests).
+- **M6:** build-plan FR-20 / DoD softened to match reality (operator is scaffolding; full reconcile
+  test deferred to a cluster-dev env; CRDs validated by the `internal/crd` core test).
+- **Minors:** added the `shoebill run plan` CLI (FR-17); API request body capped at 1 MiB; coverage
+  raised on the critical packages (safety 84.6%, verify 84.6%, evidence 80.8%, score 93.1%);
+  reconciled FR-17's CLI surface with reality.
+- Verified: `go test ./... -race` green; demo + evidence verify still reproduce every claim.

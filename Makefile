@@ -52,10 +52,10 @@ race:
 demo: build
 	./$(BIN) demo --seed
 
-## serve: build and serve the dashboard + API with demo data on :8099
+## serve: build and serve the dashboard + API with demo data on localhost:8099
 .PHONY: serve
 serve: build
-	./$(BIN) serve --demo --addr :8099
+	./$(BIN) serve --demo --addr 127.0.0.1:8099
 
 ## verify: verify the signatures of the demo evidence ledger
 .PHONY: verify

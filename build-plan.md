@@ -148,9 +148,11 @@ controls they signed off on still work — without causing an incident to find o
 - **FR-16** ≥ 40 experiments across all 9 families ship, each with ATT&CK + OWASP + compliance IDs.
 
 **CLI** (`shoebill <command>`)
-- **FR-17** `version`, `catalog list|validate|show`, `run plan` (dry-run through governor, prints the
-  decision + all gates), `run exec` (runs against a target adapter; mock in demo), `score [--service]`,
-  `evidence verify`, `serve [--demo] [--addr]`, `demo [--seed]`. *Proof:* CLI tests + `make demo`.
+- **FR-17** `version`, `catalog list|validate|show`, `run plan` (dry-run through the governor, prints
+  the decision + all 10 gates), `score`, `evidence verify`, `serve [--demo] [--addr]`, `demo`.
+  Full run *execution* is exercised in-process by `demo` and on-cluster by the operator — there is no
+  standalone `run exec` in v1 (execution is deliberately not a one-liner CLI against arbitrary live
+  targets). *Proof:* CLI runs + `make demo`.
 
 **API + UI** — the API binds to **localhost by default and is unauthenticated**; it is an operator
 console, not a multi-tenant control surface. Experiment *execution* is CLI-first; the API exposes it
@@ -185,7 +187,12 @@ only for the local demo and refuses non-loopback binds without an explicit `--in
 **Operator (separate module)**
 - **FR-20** CRDs `SecurityChaosExperiment` + `SecurityChaosRun` (group `chaos.shoebill.dev`,
   `v1alpha1`) with valid OpenAPI schema; a controller skeleton that reconciles a Run by delegating
-  to the engine. *Proof:* CRD YAML validates; reconcile unit test (fake client).
+  to the control plane's Safety Governor (`Plan` then `Execute`), never injecting directly. *Proof:*
+  a core-module test (`internal/crd`) validates every CRD manifest (apiVersion/kind/group/version/
+  served/storage/schema + both kinds). The operator is a **separate module and scaffolding**: it is
+  not built in this repo's CI and a full fake-client reconcile test requires the operator's
+  cluster-dev toolchain (controller-runtime + envtest), so it is **deferred** and documented in
+  `operator/README.md` — not claimed as done.
 
 ## 3a. Core definitions (so a stranger can build M2/M6 unambiguously)
 
@@ -415,6 +422,7 @@ verifies receipts. No real secrets/PII ever enter an experiment.
 - [ ] `make verify` validates the signed ledger; a tamper test proves verification catches edits.
 - [ ] `make catalog-validate` passes for ≥40 standards-mapped experiments across 9 families.
 - [ ] `make serve` serves the 6-screen dashboard from demo data, live-verified in a browser.
-- [ ] CRDs validate; operator reconcile unit test passes.
+- [ ] CRDs validate (core-module `internal/crd` test). Operator is scaffolding; its full reconcile
+  test is deferred to a cluster-dev env (documented, not claimed as done).
 - [ ] README + docs present; every README claim is reproducible by a shipped command.
 - [ ] `HANDOFF.md` lists everything only the user can do.

@@ -97,11 +97,17 @@ func (c Capability) Allows(action string) bool {
 
 // Authorize is the full check a detonator performs before acting: valid signature,
 // unexpired, correct target, and the action within scope.
+//
+// A capability is minted per run (fresh RunUUID), scoped to one target, and time-boxed,
+// so it is single-use by construction: the engine mints one per Run call and never
+// persists or exposes it. Within its short TTL it authorizes only its own target+scopes.
 func (c Capability) Authorize(pub ed25519.PublicKey, now time.Time, target, action string) error {
 	if err := c.Verify(pub, now); err != nil {
 		return err
 	}
-	if c.Target != "" && target != "" && c.Target != target {
+	// When the capability carries a target, the caller's target MUST match it — an
+	// empty caller target is a mismatch, not a skip (closes the empty-target bypass).
+	if c.Target != "" && c.Target != target {
 		return fmt.Errorf("%w: cap=%q action-target=%q", ErrCapTarget, c.Target, target)
 	}
 	if !c.Allows(action) {

@@ -66,7 +66,8 @@ func demoExperiments() map[model.Family]model.Experiment {
 				{Stage: model.Alerted, Source: model.SourceMock, Query: "alerted",
 					Expect: model.Expectation{Type: model.ExpectPresent}, SLOms: 300000},
 			},
-			BlastRadius: model.BlastRadius{MaxPods: 1, MaxPctReplicas: 20, MaxDurationSeconds: 60},
+			BlastRadius:   model.BlastRadius{MaxPods: 1, MaxPctReplicas: 20, MaxDurationSeconds: 60},
+			ExpectedNoise: []string{"PodRestartRate", "ProxyReloadRate"}, // suppressed; never an asserted alert
 		}
 	}
 	return out

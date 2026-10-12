@@ -46,6 +46,9 @@ func (m *Mock) Detonate(_ context.Context, spec Spec, cap model.Capability) (Art
 	if err := cap.Authorize(m.pub, m.now(), spec.Target, "detonator:mock"); err != nil {
 		return Artifacts{}, fmt.Errorf("mock detonator refused: %w", err)
 	}
+	if err := enforceActionScope(cap, spec); err != nil {
+		return Artifacts{}, fmt.Errorf("mock detonator refused: %w", err)
+	}
 	m.env.Inject(cap.RunUUID)
 	return Artifacts{UUID: cap.RunUUID, Fingerprints: m.Fingerprints(cap.RunUUID)}, nil
 }

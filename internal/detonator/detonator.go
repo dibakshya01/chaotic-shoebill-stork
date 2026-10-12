@@ -6,9 +6,23 @@ package detonator
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/dibakshya01/chaotic-shoebill-stork/internal/model"
 )
+
+// enforceActionScope makes the governor-minted "action:<x>" capability scope
+// load-bearing: a detonator refuses an action its capability does not authorize. When
+// the spec declares no action there is nothing extra to enforce.
+func enforceActionScope(cap model.Capability, spec Spec) error {
+	if spec.Action == "" {
+		return nil
+	}
+	if !cap.Allows("action:" + spec.Action) {
+		return fmt.Errorf("capability does not authorize action %q (scopes %v)", spec.Action, cap.Scopes)
+	}
+	return nil
+}
 
 // RunHeader is the correlation header woven into HTTP artifacts (kept in sync with
 // verify/sources.RunHeader).

@@ -10,8 +10,12 @@ import (
 	"github.com/dibakshya01/chaotic-shoebill-stork/internal/safety"
 )
 
+// maxBodyBytes bounds request bodies so a large POST cannot exhaust memory.
+const maxBodyBytes = 1 << 20 // 1 MiB
+
 // handleValidate validates a composed experiment (the Experiment Builder's check).
 func (s *Server) handleValidate(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
 	var e model.Experiment
 	if err := json.NewDecoder(r.Body).Decode(&e); err != nil {
 		writeJSON(w, http.StatusBadRequest, apiError("invalid experiment JSON: "+err.Error()))
@@ -43,6 +47,7 @@ type planRequest struct {
 
 // handlePlan runs the Safety Governor WITHOUT detonating (the safety-preview screen).
 func (s *Server) handlePlan(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
 	var req planRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, http.StatusBadRequest, apiError("invalid plan JSON: "+err.Error()))
