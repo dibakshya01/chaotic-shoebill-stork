@@ -46,6 +46,32 @@ func TestUntestedScoresZeroAndCoverage(t *testing.T) {
 	}
 }
 
+func TestInconclusiveDoesNotInflateScore(t *testing.T) {
+	svc := model.Service{ID: "checkout", Name: "checkout", Tier: 1}
+	specs := []ServiceSpec{{Service: svc, Expected: []model.Family{model.FamilyMesh, model.FamilyGateway}}}
+	runs := []RunRecord{
+		{ServiceID: "checkout", Family: model.FamilyMesh, Verdict: model.Pass, Raw: 1.0, At: now},
+		// A partially-inconclusive run: some stages passed (Raw>0) but the verdict is INCONCLUSIVE.
+		{ServiceID: "checkout", Family: model.FamilyGateway, Verdict: model.Inconclusive, Raw: 0.62, At: now},
+	}
+	sc := Build(specs, runs, nil, now)
+	card := sc.Services[0]
+	gw := card.Cells[model.FamilyGateway]
+	if gw.State != "untested" {
+		t.Fatalf("inconclusive cell should render untested, got %s", gw.State)
+	}
+	if gw.Score != 0 {
+		t.Fatalf("inconclusive cell must score 0 (we learned nothing), got %v", gw.Score)
+	}
+	// mesh 1.0 + gateway 0 → service 0.5, NOT inflated by the inconclusive raw.
+	if card.Score != 0.5 {
+		t.Fatalf("service score = %v, want 0.5 (inconclusive must not inflate it)", card.Score)
+	}
+	if sc.Summary.CoverageTested != 1 {
+		t.Fatalf("inconclusive must not count as covered; coverage tested = %d", sc.Summary.CoverageTested)
+	}
+}
+
 func TestTier1FailOpenCaps(t *testing.T) {
 	svc := model.Service{ID: "checkout", Name: "checkout", Tier: 1}
 	specs := []ServiceSpec{{Service: svc, Expected: []model.Family{model.FamilyMesh, model.FamilyGateway}}}

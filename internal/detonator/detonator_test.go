@@ -169,8 +169,12 @@ func TestHTTPDetonatorEgressGuard(t *testing.T) {
 		"http://10.0.0.5/",                         // RFC1918 private
 		"http://100.64.0.1/",                       // RFC6598 CGNAT
 	} {
-		if _, err := guarded.Detonate(context.Background(), Spec{Target: target, Params: map[string]any{"url": u}}, cap); err == nil {
+		_, err := guarded.Detonate(context.Background(), Spec{Target: target, Params: map[string]any{"url": u}}, cap)
+		if err == nil {
 			t.Fatalf("egress guard must block %s", u)
+		}
+		if !strings.Contains(err.Error(), "blocked") {
+			t.Fatalf("expected a 'blocked' egress error for %s, got: %v", u, err)
 		}
 	}
 }

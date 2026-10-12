@@ -201,6 +201,23 @@ func Validate(e model.Experiment) []error {
 	return errs
 }
 
+// DuplicateNames returns the experiment names that appear in more than one file (sorted).
+// Duplicate names would silently shadow each other, so `catalog validate` rejects them.
+func DuplicateNames(exps []model.Experiment) []string {
+	count := map[string]int{}
+	for _, e := range exps {
+		count[e.Meta.Name]++
+	}
+	var dups []string
+	for name, n := range count {
+		if n > 1 {
+			dups = append(dups, name)
+		}
+	}
+	sort.Strings(dups)
+	return dups
+}
+
 // ValidateServices checks the registry (every service has a tier in {1,2,3}).
 func ValidateServices(specs []score.ServiceSpec) []error {
 	var errs []error

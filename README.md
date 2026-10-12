@@ -128,7 +128,7 @@ safer, or more trustworthy**, it's out of scope.
 2. GATE         Safety Governor: env? blackout? budget? approvals? steady state P true NOW?
                 concurrency? fault domains distinct?  (any no → REFUSE, with a reason + remedy)
 3. ARM          Mint a signed, scoped, time-boxed capability. Register expected-noise suppression.
-                Announce. Start the dead-man's switch. Generate the run UUID.
+                Announce. Arm the dead-man's switch. Generate the run UUID.
 4. DETONATE     Inject condition X, with the run UUID woven into every artifact.
 5. OBSERVE      Collect the ladder, correlating strictly on the UUID:
                 PREVENTED? DETECTED? ALERTED? PAGED? — and each stage's latency.

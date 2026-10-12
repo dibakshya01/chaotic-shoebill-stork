@@ -91,3 +91,22 @@ was done, what was verified, and anything deferred.
   release workflow, ROADMAP) so it runs on any VM/cloud/cluster; added the Security Chaos Engineering
   explainer to the README + landing page.
 - Verified: `go test ./... -race` green; demo/evidence/catalog/loopback-serve all reproduce.
+
+### Round 3 ✅ (fresh reviewer) → **GO for public push**
+- Verdict: launch-ready. No Critical, no security-blocking issue; all R1/R2 fixes verified
+  empirically (the egress guard even resists IPv4-mapped-IPv6, integer-IP, and DNS-to-loopback
+  bypasses; the evidence ledger, capability model, and K8s hardening called out as exemplary).
+- Fixed the one honesty moderate: a partially-INCONCLUSIVE run inflated the efficacy *score* (coverage
+  already excluded it). Now an untested/inconclusive cell scores 0 — "if we couldn't observe, we
+  learned nothing" — with a regression test.
+- Polish: README core-loop "arm" wording; egress test asserts the block reason; release workflow uses
+  least-privilege per-job permissions + **cosign keyless image signing** (a supply-chain tool signs
+  its own images); `catalog.DuplicateNames` helper + a new catalog test package (coverage 0→87%).
+- Coverage now: safety 84.6% · verify 84.6% · score 95.5% · evidence 80.8% · catalog 86.9% ·
+  verify/sources 74.0%. `go test ./... -race` green; demo reproduces Efficacy 53% / 3 fail-open /
+  17 verified receipts / 60 valid experiments.
+
+## Phase 6 — Distribution (GitHub Marketplace N/A) + Phase 7 — Handoff
+- Marketplace lists only Actions/Apps; this is a CLI/platform → not eligible. Distribution is
+  `go install` + container (GHCR) + Homebrew (GoReleaser) + K8s — see HANDOFF.md.
+- Pushed to github.com/dibakshya01/chaotic-shoebill-stork; Pages + release per HANDOFF.
