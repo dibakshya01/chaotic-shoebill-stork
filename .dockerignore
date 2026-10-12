@@ -1,0 +1,16 @@
+# Keep the build context small and never ship secrets or the confidential source doc.
+.git
+.github
+bin
+dist
+docs
+*.md
+!go.mod
+.shoebill
+data
+*.db
+LAUNCH.md
+chaotic-shoebill-stork.md
+*.internal.md
+web/node_modules
+operator

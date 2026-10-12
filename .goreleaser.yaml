@@ -1,0 +1,52 @@
+# GoReleaser builds cross-platform binaries + checksums on each tag.
+# Local dry run:  goreleaser release --snapshot --clean
+version: 2
+project_name: shoebill
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: shoebill
+    main: ./cmd/shoebill
+    binary: shoebill
+    env:
+      - CGO_ENABLED=0
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    ldflags:
+      - -s -w
+      - -X github.com/dibakshya01/chaotic-shoebill-stork/internal/buildinfo.Version={{ .Version }}
+      - -X github.com/dibakshya01/chaotic-shoebill-stork/internal/buildinfo.Commit={{ .ShortCommit }}
+      - -X github.com/dibakshya01/chaotic-shoebill-stork/internal/buildinfo.Date={{ .Date }}
+
+archives:
+  - id: shoebill
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - LICENSE
+      - NOTICE
+      - README.md
+      - catalog/**/*
+
+checksum:
+  name_template: "checksums.txt"
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  use: github
+  sort: asc
+
+# Homebrew tap (optional): create `dibakshya01/homebrew-tap` and a PAT, then uncomment.
+# brews:
+#   - name: shoebill
+#     repository: { owner: dibakshya01, name: homebrew-tap }
+#     homepage: "https://github.com/dibakshya01/chaotic-shoebill-stork"
+#     description: "Security Chaos Engineering — prove your security controls actually work."
+#     license: "Apache-2.0"

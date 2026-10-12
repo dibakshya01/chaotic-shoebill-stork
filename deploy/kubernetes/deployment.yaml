@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shoebill
+  namespace: shoebill
+  labels: {app.kubernetes.io/name: shoebill, app.kubernetes.io/component: control-plane}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app.kubernetes.io/name: shoebill}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: shoebill, app.kubernetes.io/component: control-plane}
+    spec:
+      serviceAccountName: shoebill
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: shoebill
+          # Replace with your pushed image, e.g. ghcr.io/dibakshya01/shoebill:v0.1.0
+          image: ghcr.io/dibakshya01/shoebill:latest
+          imagePullPolicy: IfNotPresent
+          args: ["serve", "--demo", "--addr", "0.0.0.0:8099", "--insecure-remote", "--dir", "/data"]
+          ports:
+            - {name: http, containerPort: 8099}
+          readinessProbe:
+            httpGet: {path: /api/v1/healthz, port: http}
+            initialDelaySeconds: 2
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: {path: /api/v1/healthz, port: http}
+            initialDelaySeconds: 5
+            periodSeconds: 20
+          resources:
+            requests: {cpu: 50m, memory: 64Mi}
+            limits: {cpu: 500m, memory: 256Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+          volumeMounts:
+            - {name: data, mountPath: /data}
+      volumes:
+        # Evidence + state. Swap for a PVC to persist the signed ledger across restarts.
+        - name: data
+          emptyDir: {}

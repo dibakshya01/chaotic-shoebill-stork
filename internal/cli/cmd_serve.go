@@ -34,6 +34,10 @@ func registerServeCmd(root *cobra.Command, stdout, stderr io.Writer) {
 				return fmt.Errorf("refusing to bind non-loopback address %q: the API is unauthenticated; "+
 					"pass --insecure-remote to override (unsupported)", addr)
 			}
+			if !isLoopback(host) && insecureRemote {
+				fmt.Fprintf(stderr, "%s⚠ WARNING%s binding %s with --insecure-remote: the API is UNAUTHENTICATED.\n"+
+					"  Only do this behind an authenticating proxy / ingress on a trusted network.\n", cRed+cBold, cReset, addr)
+			}
 
 			if useDemo {
 				if _, serr := statState(dir); serr != nil {

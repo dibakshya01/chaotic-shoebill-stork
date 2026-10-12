@@ -1,0 +1,11 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+# kubectl apply -k deploy/kubernetes/
+resources:
+  - service-and-rbac.yaml
+  - deployment.yaml
+  # The CRDs live with the operator; apply them too when you run the on-cluster operator:
+  #   kubectl apply -f operator/config/crd/
+images:
+  - name: ghcr.io/dibakshya01/shoebill
+    newTag: latest

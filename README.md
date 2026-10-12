@@ -205,11 +205,31 @@ internal/detonator/ safe detonators            catalog/           the experiment
 operator/         Kubernetes CRDs + controller (separate module)
 ```
 
+## Run it anywhere
+
+`shoebill` is a single static Go binary (~9 MB) with the dashboard embedded — no runtime
+dependencies — so it runs on a laptop, a VM, a container, or a Kubernetes pod.
+
+```bash
+# container (distroless, ~10 MB, non-root)
+docker build -t shoebill:dev . && docker run --rm -p 8099:8099 shoebill:dev
+
+# kubernetes (GKE / EKS / AKS / kind)
+kubectl apply -k deploy/kubernetes/ && kubectl -n shoebill port-forward svc/shoebill 8099:80
+```
+
+The control plane runs on any cloud today. Real *in-cluster* detonation (container-kill, Istio,
+NetworkPolicy) is the Kubernetes **operator** — CRDs are ready to apply; the controller is the next
+milestone. Deep cloud *attack* coverage (metadata/IAM/VPC detonators, cloud monitoring sources) is on
+the roadmap, via Stratus Red Team behind the detonator interface. See [`deploy/`](deploy/README.md)
+and [`ROADMAP.md`](ROADMAP.md).
+
 ## Documentation
 
 - [Architecture](docs/architecture.md) · [Safety model](docs/safety-model.md) ·
   [Standards mapping](docs/standards-mapping.md)
 - [Writing experiments](docs/writing-experiments.md) · [What it can & cannot do](docs/can-and-cannot.md)
+- [Deploying](deploy/README.md) · [Roadmap](ROADMAP.md)
 - [Research & the gap](finding.md) · [Build plan / spec](build-plan.md) · [Charter](CHARTER.md)
 
 ## Contributing

@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: shoebill
+  labels: {app.kubernetes.io/name: shoebill}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: shoebill
+  namespace: shoebill
+# The control plane itself needs no cluster permissions. The future operator/agent (which
+# performs in-cluster detonations) gets its own narrowly-scoped, per-experiment identity —
+# never a broad standing grant. See operator/.
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: shoebill
+  namespace: shoebill
+  labels: {app.kubernetes.io/name: shoebill}
+spec:
+  type: ClusterIP
+  selector: {app.kubernetes.io/name: shoebill}
+  ports:
+    - {name: http, port: 80, targetPort: http}
+# NOTE: the dashboard API is UNAUTHENTICATED. Do not expose this Service publicly as-is —
+# front it with an authenticating ingress / proxy, or port-forward for local access:
+#   kubectl -n shoebill port-forward svc/shoebill 8099:80
