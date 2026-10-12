@@ -1,0 +1,72 @@
+apiVersion: chaos.shoebill.dev/v1alpha1
+kind: SecurityChaosExperiment
+metadata:
+  name: det-04-log-pipeline-integrity
+  version: 1
+  title: Log-pipeline integrity — complete and on time
+family: detection
+blastRadiusClass: medium
+description: >
+  Injects a known volume of marked audit events for {{.target}} and verifies they all arrive at
+  the SIEM, complete and within the latency SLO. A marked event that is dropped or arrives late
+  is a silent gap in the audit record.
+controls: [log-pipeline, siem, detection-rule]
+attackIds: [T1562.008]
+owaspIds: [A09:2025]
+controlFamilies: [ISO-A.8.15, NIST-AU-2, NIST-AU-12]
+hypothesis:
+  statement: >
+    When a known volume of marked audit events is emitted for {{.target}}, every event arrives
+    at the SIEM within the latency SLO; zero marked events are dropped or arrive late.
+  steadyState:
+    - source: prometheus
+      query: 'up{job="log-pipeline",service="{{.target}}"}'
+      expect: {type: threshold, op: eq, value: 1}
+    - source: prometheus
+      query: 'log_events_received_total{service="{{.target}}"}'
+      expect: {type: present}
+injection:
+  detonator: exec
+  mode: inject
+  spec:
+    action: marked-event-inject
+    target: '{{.target}}'
+    eventCount: 1000
+  duration: "60s"
+  reversible: true
+  revertVerification:
+    source: prometheus
+    query: 'up{job="log-pipeline",service="{{.target}}"}'
+    expect: {type: threshold, op: eq, value: 1}
+assertions:
+  - stage: PREVENTED
+    source: applog
+    query: 'service="{{.target}}" AND marked=true AND (received=false OR latency_ms>slo)'
+    expect: {type: absent}
+    sloMs: 0
+    requireUuid: false
+    justification: >
+      Asserts the ABSENCE of any marked event dropped or arriving past the latency SLO over all
+      injected events in the window; UUID scoping would miss a real audit-record gap.
+    securityRelevant: true
+  - stage: DETECTED
+    source: prometheus
+    query: 'increase(log_events_received_total{service="{{.target}}",source="marked"}[2m])'
+    expect: {type: threshold, op: gt, value: 0}
+    sloMs: 60000
+  - stage: ALERTED
+    source: alertmanager
+    query: LogPipelineLag
+    expect: {type: present}
+    sloMs: 300000
+blastRadius:
+  maxPods: 1
+  maxPctReplicas: 5
+  maxDurationSeconds: 75
+  maxTrafficPct: 0
+expectedNoise:
+  - LogPipelineThroughput
+promotion:
+  requiresPassIn: [playground, stage, preprod]
+  withinDays: 14
+capabilities: [detection-injection, prod-injection]

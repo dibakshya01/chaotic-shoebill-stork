@@ -1,0 +1,72 @@
+apiVersion: chaos.shoebill.dev/v1alpha1
+kind: SecurityChaosExperiment
+metadata:
+  name: net-01-network-group-isolation
+  version: 1
+  title: Network-group isolation enforced
+family: network
+blastRadiusClass: medium
+description: >
+  A workload in one network group attempts to reach a service in another group on {{.target}}
+  over a port that segmentation policy does not permit. The network control must deny it,
+  containing lateral movement across segments.
+controls: [network-policy, network-segmentation, firewall]
+attackIds: [T1210]
+owaspIds: [API8:2023]
+controlFamilies: [ISO-A.8.22, NIST-SC-7, PCI-DSS-1]
+hypothesis:
+  statement: >
+    When a workload in a foreign network group connects to {{.target}} on a disallowed port,
+    the network control denies it; zero cross-group connections are established.
+  steadyState:
+    - source: prometheus
+      query: 'sum(rate(network_flows_total{service="{{.target}}",allowed="true"}[2m])) > 0'
+      expect: {type: threshold, op: gt, value: 0}
+    - source: prometheus
+      query: 'network_policy_denied_total{service="{{.target}}"}'
+      expect: {type: present}
+injection:
+  detonator: network
+  mode: inject
+  spec:
+    action: cross-group-probe
+    target: '{{.target}}'
+  duration: "45s"
+  reversible: true
+  revertVerification:
+    source: prometheus
+    query: 'up{job="network-policy-agent",service="{{.target}}"}'
+    expect: {type: threshold, op: eq, value: 1}
+assertions:
+  - stage: PREVENTED
+    source: applog
+    query: 'service="{{.target}}" AND cross_group=true AND connection_established=true'
+    expect: {type: absent}
+    sloMs: 0
+    requireUuid: false
+    justification: >
+      Asserts the ABSENCE of any established cross-group connection over all flows in the
+      window; UUID scoping would miss real lateral movement across segments.
+    securityRelevant: true
+  - stage: DETECTED
+    source: prometheus
+    query: 'increase(network_policy_denied_total{service="{{.target}}",rule="group_isolation"}[2m])'
+    expect: {type: threshold, op: gt, value: 0}
+    sloMs: 60000
+  - stage: ALERTED
+    source: alertmanager
+    query: NetworkGroupViolation
+    expect: {type: present}
+    sloMs: 300000
+blastRadius:
+  maxPods: 1
+  maxPctReplicas: 5
+  maxDurationSeconds: 60
+  maxTrafficPct: 1
+  requiresDistinctFaultDomains: true
+expectedNoise:
+  - NetworkPolicyDenyRate
+promotion:
+  requiresPassIn: [playground, stage, preprod]
+  withinDays: 14
+capabilities: [network-injection, prod-injection]

@@ -1,0 +1,72 @@
+apiVersion: chaos.shoebill.dev/v1alpha1
+kind: SecurityChaosExperiment
+metadata:
+  name: sc-05-dependency-confusion-resistance
+  version: 1
+  title: Dependency-confusion resistance
+family: supplychain
+blastRadiusClass: low
+description: >
+  Resolves a build for {{.target}} while a higher-version lookalike of an internal package is
+  available on a public index, and verifies the resolver prefers the internal registry. Pulling
+  the public lookalike is a dependency-confusion supply-chain compromise.
+controls: [artifact-registry, dependency-resolver, policy-engine]
+attackIds: [T1195.002]
+owaspIds: [A08:2025]
+controlFamilies: [ISO-A.8.28, NIST-SR-3, NIST-SR-4]
+hypothesis:
+  statement: >
+    When an internal-named package for {{.target}} has a higher-version public lookalike, the
+    resolver pulls the internal package; zero builds resolve the internal name from a public
+    source.
+  steadyState:
+    - source: prometheus
+      query: 'up{job="dependency-resolver"}'
+      expect: {type: threshold, op: eq, value: 1}
+    - source: prometheus
+      query: 'dependency_resolutions_total{service="{{.target}}"} > 0'
+      expect: {type: threshold, op: gt, value: 0}
+injection:
+  detonator: exec
+  mode: inject
+  spec:
+    action: dependency-confusion-probe
+    target: '{{.target}}'
+  duration: "45s"
+  reversible: true
+  revertVerification:
+    source: prometheus
+    query: 'up{job="dependency-resolver"}'
+    expect: {type: threshold, op: eq, value: 1}
+assertions:
+  - stage: PREVENTED
+    source: applog
+    query: 'service="{{.target}}" AND package_scope="internal" AND resolved_source="public"'
+    expect: {type: absent}
+    sloMs: 0
+    requireUuid: false
+    justification: >
+      Asserts the ABSENCE of any internal-named package resolved from a public source over all
+      resolutions in the window; UUID scoping would miss a real dependency-confusion pull.
+    securityRelevant: true
+  - stage: DETECTED
+    source: prometheus
+    query: 'increase(dependency_resolution_blocked_total{service="{{.target}}",reason="namespace_confusion"}[2m])'
+    expect: {type: threshold, op: gt, value: 0}
+    sloMs: 60000
+  - stage: ALERTED
+    source: alertmanager
+    query: DependencyConfusionAttempt
+    expect: {type: present}
+    sloMs: 300000
+blastRadius:
+  maxPods: 0
+  maxPctReplicas: 0
+  maxDurationSeconds: 60
+  maxTrafficPct: 0
+expectedNoise:
+  - DependencyResolverLatency
+promotion:
+  requiresPassIn: [playground, stage, preprod]
+  withinDays: 14
+capabilities: [supplychain-injection, pipeline-injection, prod-injection]

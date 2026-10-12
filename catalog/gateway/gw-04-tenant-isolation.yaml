@@ -1,0 +1,74 @@
+apiVersion: chaos.shoebill.dev/v1alpha1
+kind: SecurityChaosExperiment
+metadata:
+  name: gw-04-tenant-isolation
+  version: 1
+  title: Tenant isolation — cross-tenant token denied
+family: gateway
+blastRadiusClass: medium
+description: >
+  Presents a valid token scoped to tenant A against a tenant-B resource on {{.target}} and
+  verifies the gateway returns 403. Cross-tenant access must never succeed, even with an
+  otherwise valid token.
+controls: [api-gateway, authorization-service, tenant-isolation]
+attackIds: [T1078]
+owaspIds: [API5:2023]
+controlFamilies: [ISO-A.5.18, NIST-AC-3, SOC2-CC6.3]
+hypothesis:
+  statement: >
+    When a token scoped to one tenant is used against another tenant's resource on
+    {{.target}}, the gateway returns 403; zero cross-tenant requests are served 200.
+  steadyState:
+    - source: http
+      query: 'GET https://{{.target}}/internal/health'
+      expect: {type: value, op: eq, value: 200}
+    - source: prometheus
+      query: 'gateway_authz_denied_total{service="{{.target}}"}'
+      expect: {type: present}
+injection:
+  detonator: http
+  mode: inject
+  spec:
+    action: cross-tenant-token-probe
+    target: '{{.target}}'
+    tokenTenant: tenant-a
+    resourceTenant: tenant-b
+  duration: "45s"
+  reversible: true
+  revertVerification:
+    source: prometheus
+    query: 'up{job="api-gateway",service="{{.target}}"}'
+    expect: {type: threshold, op: eq, value: 1}
+assertions:
+  - stage: PREVENTED
+    source: gwlog
+    query: 'service="{{.target}}" AND token_tenant!=resource_tenant AND code=200'
+    expect: {type: absent}
+    sloMs: 0
+    requireUuid: false
+    justification: >
+      Asserts the ABSENCE of any cross-tenant request served 200 over all traffic in the
+      window; UUID scoping would miss a real cross-tenant leak outside synthetic probes.
+    securityRelevant: true
+  - stage: DETECTED
+    source: prometheus
+    query: 'increase(gateway_authz_denied_total{service="{{.target}}",reason="tenant_mismatch"}[2m])'
+    expect: {type: threshold, op: gt, value: 0}
+    sloMs: 60000
+  - stage: ALERTED
+    source: alertmanager
+    query: CrossTenantAccessAttempt
+    expect: {type: present}
+    sloMs: 300000
+blastRadius:
+  maxPods: 1
+  maxPctReplicas: 5
+  maxDurationSeconds: 60
+  maxTrafficPct: 1
+  requiresDistinctFaultDomains: true
+expectedNoise:
+  - GatewayAuthzDenyRate
+promotion:
+  requiresPassIn: [playground, stage, preprod]
+  withinDays: 14
+capabilities: [gateway-injection, prod-injection]

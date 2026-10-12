@@ -1,0 +1,72 @@
+apiVersion: chaos.shoebill.dev/v1alpha1
+kind: SecurityChaosExperiment
+metadata:
+  name: data-06-cross-region-token-mapping-isolation
+  version: 1
+  title: Cross-region token-mapping isolation
+family: data
+blastRadiusClass: medium
+description: >
+  Attempts to detokenize a token minted in one region against the tokenization-vault of
+  another region for {{.target}} and verifies it is denied. Token-to-value mappings must stay
+  isolated per region so a token cannot be resolved outside its region of origin.
+controls: [tokenization-vault, data-residency, service-perimeter]
+attackIds: [T1530]
+owaspIds: [API3:2023]
+controlFamilies: [DPDP-S.8, ISO-A.8.11, NIST-SC-7, NIST-AC-4]
+hypothesis:
+  statement: >
+    When a token minted in region A is submitted for detokenization in region B for
+    {{.target}}, the request is denied; zero cross-region detokenizations succeed.
+  steadyState:
+    - source: prometheus
+      query: 'sum(rate(detokenize_requests_total{service="{{.target}}",same_region="true",code="200"}[2m])) > 0'
+      expect: {type: threshold, op: gt, value: 0}
+    - source: prometheus
+      query: 'token_mapping_cross_region_denied_total{service="{{.target}}"}'
+      expect: {type: present}
+injection:
+  detonator: http
+  mode: inject
+  spec:
+    action: cross-region-detokenize-probe
+    target: '{{.target}}'
+  duration: "45s"
+  reversible: true
+  revertVerification:
+    source: prometheus
+    query: 'up{job="tokenization-vault"}'
+    expect: {type: threshold, op: eq, value: 1}
+assertions:
+  - stage: PREVENTED
+    source: applog
+    query: 'service="{{.target}}" AND token_origin_region!=request_region AND detokenize_result="success"'
+    expect: {type: absent}
+    sloMs: 0
+    requireUuid: false
+    justification: >
+      Asserts the ABSENCE of any successful cross-region detokenization over all requests in
+      the window; UUID scoping would miss a real residency breach.
+    securityRelevant: true
+  - stage: DETECTED
+    source: prometheus
+    query: 'increase(token_mapping_cross_region_denied_total{service="{{.target}}"}[2m])'
+    expect: {type: threshold, op: gt, value: 0}
+    sloMs: 60000
+  - stage: ALERTED
+    source: alertmanager
+    query: CrossRegionDetokenization
+    expect: {type: present}
+    sloMs: 300000
+blastRadius:
+  maxPods: 1
+  maxPctReplicas: 5
+  maxDurationSeconds: 60
+  maxTrafficPct: 1
+  requiresDistinctFaultDomains: true
+expectedNoise:
+  - DetokenizeDenyRate
+promotion:
+  requiresPassIn: [playground, stage, preprod]
+  withinDays: 14
+capabilities: [data-injection, prod-injection]

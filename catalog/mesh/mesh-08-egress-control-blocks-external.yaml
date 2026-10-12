@@ -1,0 +1,73 @@
+apiVersion: chaos.shoebill.dev/v1alpha1
+kind: SecurityChaosExperiment
+metadata:
+  name: mesh-08-egress-control-blocks-external
+  version: 1
+  title: Egress control blocks arbitrary external hosts
+family: mesh
+blastRadiusClass: medium
+description: >
+  A workload backing {{.target}} attempts to reach an external host that is not on the egress
+  allowlist. The mesh egress gateway must block the connection, preventing exfiltration to an
+  arbitrary destination.
+controls: [service-mesh, egress-gateway, network-policy]
+attackIds: [T1048]
+owaspIds: [API8:2023]
+controlFamilies: [ISO-A.8.22, NIST-SC-7, NIST-AC-4]
+hypothesis:
+  statement: >
+    When a workload for {{.target}} attempts to connect to a host not on the egress allowlist,
+    the egress gateway blocks it; zero connections to non-allowlisted hosts are established.
+  steadyState:
+    - source: prometheus
+      query: 'sum(rate(mesh_egress_requests_total{service="{{.target}}",allowlisted="true",code!~"5.."}[2m])) > 0'
+      expect: {type: threshold, op: gt, value: 0}
+    - source: prometheus
+      query: 'mesh_egress_denied_total{service="{{.target}}"}'
+      expect: {type: present}
+injection:
+  detonator: network
+  mode: inject
+  spec:
+    action: egress-arbitrary-host-probe
+    target: '{{.target}}'
+    externalHost: not-allowlisted.example
+  duration: "45s"
+  reversible: true
+  revertVerification:
+    source: prometheus
+    query: 'up{job="egress-gateway",service="{{.target}}"}'
+    expect: {type: threshold, op: eq, value: 1}
+assertions:
+  - stage: PREVENTED
+    source: gwlog
+    query: 'service="{{.target}}" AND egress_allowlisted=false AND connection_established=true'
+    expect: {type: absent}
+    sloMs: 0
+    requireUuid: false
+    justification: >
+      Asserts the ABSENCE of any established connection to a non-allowlisted external host over
+      all egress traffic in the window; UUID scoping would miss real exfiltration paths.
+    securityRelevant: true
+  - stage: DETECTED
+    source: prometheus
+    query: 'increase(mesh_egress_denied_total{service="{{.target}}"}[2m])'
+    expect: {type: threshold, op: gt, value: 0}
+    sloMs: 60000
+  - stage: ALERTED
+    source: alertmanager
+    query: UnauthorizedEgressAttempt
+    expect: {type: present}
+    sloMs: 300000
+blastRadius:
+  maxPods: 1
+  maxPctReplicas: 5
+  maxDurationSeconds: 60
+  maxTrafficPct: 1
+  requiresDistinctFaultDomains: true
+expectedNoise:
+  - EgressDenyRate
+promotion:
+  requiresPassIn: [playground, stage, preprod]
+  withinDays: 14
+capabilities: [mesh-injection, network-injection, prod-injection]

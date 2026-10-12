@@ -1,0 +1,77 @@
+apiVersion: chaos.shoebill.dev/v1alpha1
+kind: SecurityChaosExperiment
+metadata:
+  name: det-02-alert-to-page-path
+  version: 1
+  title: Alert-to-page path delivered and acknowledged
+family: detection
+blastRadiusClass: medium
+description: >
+  Fires a synthetic high-severity alert for {{.target}} and verifies it is delivered and
+  acknowledged within SLO along the full alert-to-page path. A high-severity alert that is not
+  delivered or acknowledged leaves an incident unowned.
+controls: [alerting-pipeline, paging-service, detection-rule]
+attackIds: [T1562.001]
+owaspIds: [A09:2025]
+controlFamilies: [ISO-A.5.26, NIST-IR-6, SOC2-CC7.4]
+hypothesis:
+  statement: >
+    When a synthetic high-severity alert is fired for {{.target}}, it is delivered and
+    acknowledged within SLO; zero high-severity synthetic alerts go undelivered or unacked.
+  steadyState:
+    - source: prometheus
+      query: 'up{job="paging-service"}'
+      expect: {type: threshold, op: eq, value: 1}
+    - source: prometheus
+      query: 'alert_delivered_total{service="{{.target}}"}'
+      expect: {type: present}
+injection:
+  detonator: http
+  mode: inject
+  spec:
+    action: synthetic-alert-fire
+    target: '{{.target}}'
+    severity: high
+  duration: "60s"
+  reversible: true
+  revertVerification:
+    source: prometheus
+    query: 'up{job="paging-service"}'
+    expect: {type: threshold, op: eq, value: 1}
+assertions:
+  - stage: PREVENTED
+    source: applog
+    query: 'service="{{.target}}" AND severity="high" AND (delivered=false OR acknowledged=false) AND past_slo=true'
+    expect: {type: absent}
+    sloMs: 0
+    requireUuid: false
+    justification: >
+      Asserts the ABSENCE of any high-severity alert undelivered or unacknowledged past SLO over
+      all alerts in the window; UUID scoping would miss a real paging-path gap.
+    securityRelevant: true
+  - stage: DETECTED
+    source: prometheus
+    query: 'increase(alert_delivered_total{service="{{.target}}",severity="high"}[2m])'
+    expect: {type: threshold, op: gt, value: 0}
+    sloMs: 60000
+  - stage: ALERTED
+    source: alertmanager
+    query: SyntheticAlertDelivered
+    expect: {type: present}
+    sloMs: 300000
+  - stage: PAGED
+    source: alertmanager
+    query: SyntheticAlertDelivered
+    expect: {type: paged}
+    sloMs: 600000
+blastRadius:
+  maxPods: 1
+  maxPctReplicas: 5
+  maxDurationSeconds: 75
+  maxTrafficPct: 0
+expectedNoise:
+  - PagingServiceHeartbeat
+promotion:
+  requiresPassIn: [playground, stage, preprod]
+  withinDays: 14
+capabilities: [detection-injection, prod-injection]

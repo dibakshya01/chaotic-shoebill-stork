@@ -1,0 +1,74 @@
+apiVersion: chaos.shoebill.dev/v1alpha1
+kind: SecurityChaosExperiment
+metadata:
+  name: mesh-01-mtls-downgrade-refused
+  version: 1
+  title: mTLS downgrade attempt refused
+family: mesh
+blastRadiusClass: medium
+description: >
+  Verifies that the mesh refuses a plaintext / downgraded transport. A canary client
+  attempts to reach {{.target}} without mutual TLS; the mesh must reset the connection
+  rather than silently accept an unauthenticated, unencrypted session.
+controls: [service-mesh, mtls, peer-authentication]
+attackIds: [T1557]
+owaspIds: [API8:2023]
+controlFamilies: [ISO-A.8.24, NIST-SC-8, PCI-DSS-4]
+hypothesis:
+  statement: >
+    When a client attempts a plaintext or downgraded connection to {{.target}}, the mesh
+    rejects it; zero downgraded connections are served a response.
+  steadyState:
+    - source: prometheus
+      query: 'sum(rate(mesh_requests_total{service="{{.target}}",mtls="true",code!~"5.."}[2m])) > 0'
+      expect: {type: threshold, op: gt, value: 0}
+    - source: prometheus
+      query: 'mesh_tls_downgrade_rejected_total{service="{{.target}}"}'
+      expect: {type: present}
+injection:
+  detonator: network
+  mode: inject
+  spec:
+    action: mtls-downgrade-probe
+    target: '{{.target}}'
+    transport: plaintext
+  duration: "45s"
+  reversible: true
+  revertVerification:
+    source: prometheus
+    query: 'up{job="sidecar",service="{{.target}}"}'
+    expect: {type: threshold, op: eq, value: 1}
+assertions:
+  - stage: PREVENTED
+    source: gwlog
+    query: 'service="{{.target}}" AND transport="plaintext" AND code=200'
+    expect: {type: absent}
+    sloMs: 0
+    requireUuid: false
+    justification: >
+      Asserts the ABSENCE of any served plaintext/downgraded session across all traffic to
+      {{.target}} during the window; UUID scoping would narrow it to synthetic probes and
+      miss a real downgrade being accepted.
+    securityRelevant: true
+  - stage: DETECTED
+    source: prometheus
+    query: 'increase(mesh_tls_downgrade_rejected_total{service="{{.target}}"}[2m])'
+    expect: {type: threshold, op: gt, value: 0}
+    sloMs: 60000
+  - stage: ALERTED
+    source: alertmanager
+    query: MeshTlsDowngradeAttempt
+    expect: {type: present}
+    sloMs: 300000
+blastRadius:
+  maxPods: 1
+  maxPctReplicas: 5
+  maxDurationSeconds: 60
+  maxTrafficPct: 1
+  requiresDistinctFaultDomains: true
+expectedNoise:
+  - MeshConnectionResetRate
+promotion:
+  requiresPassIn: [playground, stage, preprod]
+  withinDays: 14
+capabilities: [mesh-injection, prod-injection]

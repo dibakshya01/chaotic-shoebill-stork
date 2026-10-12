@@ -1,0 +1,73 @@
+apiVersion: chaos.shoebill.dev/v1alpha1
+kind: SecurityChaosExperiment
+metadata:
+  name: net-06-cloud-metadata-endpoint-unreachable
+  version: 1
+  title: Cloud metadata endpoint unreachable from workloads
+family: network
+blastRadiusClass: medium
+description: >
+  A workload backing {{.target}} attempts to reach the raw cloud instance-metadata endpoint
+  directly to harvest credentials. Network policy must make it unreachable; only the scoped
+  metadata-proxy path is permitted.
+controls: [network-policy, metadata-proxy, workload-identity]
+attackIds: [T1552.005]
+owaspIds: [API8:2023]
+controlFamilies: [ISO-A.8.22, NIST-AC-6, NIST-SC-7]
+hypothesis:
+  statement: >
+    When a workload for {{.target}} connects directly to the raw instance-metadata endpoint,
+    the connection is blocked; zero workloads retrieve credentials from the raw endpoint.
+  steadyState:
+    - source: prometheus
+      query: 'sum(rate(metadata_proxy_requests_total{service="{{.target}}",code="200"}[2m])) > 0'
+      expect: {type: threshold, op: gt, value: 0}
+    - source: prometheus
+      query: 'metadata_access_blocked_total{service="{{.target}}"}'
+      expect: {type: present}
+injection:
+  detonator: network
+  mode: inject
+  spec:
+    action: metadata-endpoint-probe
+    target: '{{.target}}'
+    endpoint: raw-instance-metadata
+  duration: "45s"
+  reversible: true
+  revertVerification:
+    source: prometheus
+    query: 'up{job="network-policy-agent",service="{{.target}}"}'
+    expect: {type: threshold, op: eq, value: 1}
+assertions:
+  - stage: PREVENTED
+    source: applog
+    query: 'service="{{.target}}" AND endpoint="raw_instance_metadata" AND credentials_returned=true'
+    expect: {type: absent}
+    sloMs: 0
+    requireUuid: false
+    justification: >
+      Asserts the ABSENCE of any raw-metadata credential retrieval over all traffic in the
+      window; UUID scoping would miss a real credential-harvesting path.
+    securityRelevant: true
+  - stage: DETECTED
+    source: prometheus
+    query: 'increase(metadata_access_blocked_total{service="{{.target}}"}[2m])'
+    expect: {type: threshold, op: gt, value: 0}
+    sloMs: 60000
+  - stage: ALERTED
+    source: alertmanager
+    query: MetadataEndpointAccessAttempt
+    expect: {type: present}
+    sloMs: 300000
+blastRadius:
+  maxPods: 1
+  maxPctReplicas: 5
+  maxDurationSeconds: 60
+  maxTrafficPct: 1
+  requiresDistinctFaultDomains: true
+expectedNoise:
+  - NetworkPolicyDenyRate
+promotion:
+  requiresPassIn: [playground, stage, preprod]
+  withinDays: 14
+capabilities: [network-injection, prod-injection]

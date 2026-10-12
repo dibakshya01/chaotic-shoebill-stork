@@ -1,0 +1,73 @@
+apiVersion: chaos.shoebill.dev/v1alpha1
+kind: SecurityChaosExperiment
+metadata:
+  name: mesh-05-cross-namespace-lateral-call-denied
+  version: 1
+  title: Cross-namespace lateral call denied
+family: mesh
+blastRadiusClass: medium
+description: >
+  A workload in namespace {{.namespace}} attempts a lateral call to the Tier-1 service
+  {{.target}} in another namespace that mesh authorization policy does not permit. The mesh
+  must deny the call, containing lateral movement.
+controls: [service-mesh, authorization-policy, network-policy]
+attackIds: [T1210]
+owaspIds: [API5:2023]
+controlFamilies: [ISO-A.8.22, NIST-AC-4, NIST-SC-7]
+hypothesis:
+  statement: >
+    When a workload in {{.namespace}} makes a cross-namespace call to {{.target}} that policy
+    does not allow, the mesh denies it; zero unauthorized cross-namespace calls are served.
+  steadyState:
+    - source: prometheus
+      query: 'sum(rate(mesh_requests_total{service="{{.target}}",code!~"5.."}[2m])) > 0'
+      expect: {type: threshold, op: gt, value: 0}
+    - source: prometheus
+      query: 'mesh_authz_denied_total{service="{{.target}}"}'
+      expect: {type: present}
+injection:
+  detonator: network
+  mode: inject
+  spec:
+    action: cross-namespace-probe
+    target: '{{.target}}'
+    sourceNamespace: '{{.namespace}}'
+  duration: "45s"
+  reversible: true
+  revertVerification:
+    source: prometheus
+    query: 'up{job="sidecar",service="{{.target}}"}'
+    expect: {type: threshold, op: eq, value: 1}
+assertions:
+  - stage: PREVENTED
+    source: gwlog
+    query: 'service="{{.target}}" AND source_namespace="{{.namespace}}" AND policy_match=false AND code=200'
+    expect: {type: absent}
+    sloMs: 0
+    requireUuid: false
+    justification: >
+      Asserts the ABSENCE of any served unauthorized cross-namespace call over all traffic in
+      the window; synthetic-only scoping would miss real lateral movement being allowed.
+    securityRelevant: true
+  - stage: DETECTED
+    source: prometheus
+    query: 'increase(mesh_authz_denied_total{service="{{.target}}",reason="namespace_policy"}[2m])'
+    expect: {type: threshold, op: gt, value: 0}
+    sloMs: 60000
+  - stage: ALERTED
+    source: alertmanager
+    query: CrossNamespaceCallDenied
+    expect: {type: present}
+    sloMs: 300000
+blastRadius:
+  maxPods: 1
+  maxPctReplicas: 5
+  maxDurationSeconds: 60
+  maxTrafficPct: 1
+  requiresDistinctFaultDomains: true
+expectedNoise:
+  - MeshAuthzDenyRate
+promotion:
+  requiresPassIn: [playground, stage, preprod]
+  withinDays: 14
+capabilities: [mesh-injection, prod-injection]

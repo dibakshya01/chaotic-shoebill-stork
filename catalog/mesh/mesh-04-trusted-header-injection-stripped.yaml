@@ -1,0 +1,74 @@
+apiVersion: chaos.shoebill.dev/v1alpha1
+kind: SecurityChaosExperiment
+metadata:
+  name: mesh-04-trusted-header-injection-stripped
+  version: 1
+  title: Trusted-header injection stripped at the edge
+family: mesh
+blastRadiusClass: medium
+description: >
+  A client sends a request carrying a spoofed internal trust header (for example an
+  identity-assertion header the mesh normally sets itself). The api-gateway must strip any
+  client-supplied trust header so downstream services on {{.target}} cannot be impersonated.
+controls: [api-gateway, service-mesh, header-sanitization]
+attackIds: [T1078]
+owaspIds: [API8:2023]
+controlFamilies: [ISO-A.8.9, NIST-SC-23, NIST-AC-3]
+hypothesis:
+  statement: >
+    When a client supplies an internal trust header to {{.target}}, the edge strips it and
+    re-derives identity; no downstream service observes a client-supplied trust header.
+  steadyState:
+    - source: http
+      query: 'GET https://{{.target}}/internal/health'
+      expect: {type: value, op: eq, value: 200}
+    - source: prometheus
+      query: 'gateway_header_stripped_total{service="{{.target}}"}'
+      expect: {type: present}
+injection:
+  detonator: http
+  mode: inject
+  spec:
+    action: inject-trusted-header
+    target: '{{.target}}'
+    header: x-internal-identity
+  duration: "45s"
+  reversible: true
+  revertVerification:
+    source: prometheus
+    query: 'up{job="api-gateway",service="{{.target}}"}'
+    expect: {type: threshold, op: eq, value: 1}
+assertions:
+  - stage: PREVENTED
+    source: applog
+    query: 'service="{{.target}}" AND header_source="client" AND header_name="x-internal-identity"'
+    expect: {type: absent}
+    sloMs: 0
+    requireUuid: false
+    justification: >
+      Asserts that no downstream request ever carried a client-supplied trust header, over
+      all traffic in the window; UUID scoping would miss a real injected header slipping
+      through the edge.
+    securityRelevant: true
+  - stage: DETECTED
+    source: prometheus
+    query: 'increase(gateway_header_stripped_total{service="{{.target}}",header="x-internal-identity"}[2m])'
+    expect: {type: threshold, op: gt, value: 0}
+    sloMs: 60000
+  - stage: ALERTED
+    source: alertmanager
+    query: TrustedHeaderInjectionAttempt
+    expect: {type: present}
+    sloMs: 300000
+blastRadius:
+  maxPods: 1
+  maxPctReplicas: 5
+  maxDurationSeconds: 60
+  maxTrafficPct: 1
+  requiresDistinctFaultDomains: true
+expectedNoise:
+  - GatewayHeaderRewriteRate
+promotion:
+  requiresPassIn: [playground, stage, preprod]
+  withinDays: 14
+capabilities: [gateway-injection, mesh-injection, prod-injection]

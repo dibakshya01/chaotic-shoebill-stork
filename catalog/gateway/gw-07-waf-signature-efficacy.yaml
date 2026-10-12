@@ -1,0 +1,73 @@
+apiVersion: chaos.shoebill.dev/v1alpha1
+kind: SecurityChaosExperiment
+metadata:
+  name: gw-07-waf-signature-efficacy
+  version: 1
+  title: WAF signature efficacy — zero origin arrivals
+family: gateway
+blastRadiusClass: medium
+description: >
+  Sends requests carrying known attack signatures (injection and traversal payloads) to
+  {{.target}} and verifies the WAF blocks them at the edge. The origin access log must show
+  zero arrivals of the signature traffic.
+controls: [api-gateway, waf]
+attackIds: [T1190]
+owaspIds: [A03:2025]
+controlFamilies: [ISO-A.8.26, NIST-SI-10, PCI-DSS-6.4]
+hypothesis:
+  statement: >
+    When requests bearing known attack signatures hit {{.target}}, the WAF blocks them at the
+    edge; zero signature-matching requests arrive at origin.
+  steadyState:
+    - source: http
+      query: 'GET https://{{.target}}/internal/health'
+      expect: {type: value, op: eq, value: 200}
+    - source: prometheus
+      query: 'waf_blocked_total{service="{{.target}}"}'
+      expect: {type: present}
+injection:
+  detonator: http
+  mode: inject
+  spec:
+    action: waf-signature-replay
+    target: '{{.target}}'
+    ruleset: owasp-crs
+  duration: "45s"
+  reversible: true
+  revertVerification:
+    source: prometheus
+    query: 'up{job="api-gateway",service="{{.target}}"}'
+    expect: {type: threshold, op: eq, value: 1}
+assertions:
+  - stage: PREVENTED
+    source: applog
+    query: 'service="{{.target}}" AND source="origin" AND attack_signature=true'
+    expect: {type: absent}
+    sloMs: 0
+    requireUuid: false
+    justification: >
+      Asserts the ABSENCE of any signature-matching request at origin over all traffic in the
+      window; UUID scoping would miss a real payload passing the WAF to origin.
+    securityRelevant: true
+  - stage: DETECTED
+    source: prometheus
+    query: 'increase(waf_blocked_total{service="{{.target}}",ruleset="owasp_crs"}[2m])'
+    expect: {type: threshold, op: gt, value: 0}
+    sloMs: 60000
+  - stage: ALERTED
+    source: alertmanager
+    query: WafBlockSpike
+    expect: {type: present}
+    sloMs: 300000
+blastRadius:
+  maxPods: 1
+  maxPctReplicas: 5
+  maxDurationSeconds: 60
+  maxTrafficPct: 1
+  requiresDistinctFaultDomains: true
+expectedNoise:
+  - WafRuleMatchRate
+promotion:
+  requiresPassIn: [playground, stage, preprod]
+  withinDays: 14
+capabilities: [gateway-injection, prod-injection]

@@ -1,0 +1,72 @@
+apiVersion: chaos.shoebill.dev/v1alpha1
+kind: SecurityChaosExperiment
+metadata:
+  name: sc-02-privileged-container-admission-denied
+  version: 1
+  title: Privileged container admission denied
+family: supplychain
+blastRadiusClass: medium
+description: >
+  Submits a privileged pod spec (privileged, hostPID, or hostNetwork) for admission to the
+  namespace of {{.target}} and verifies the admission-controller denies it. Admitting a
+  privileged container invites container escape to the host.
+controls: [admission-controller, pod-security-policy, policy-engine]
+attackIds: [T1611]
+owaspIds: [A08:2025]
+controlFamilies: [ISO-A.8.9, NIST-CM-7, NIST-AC-6]
+hypothesis:
+  statement: >
+    When a privileged pod spec is submitted for admission to {{.target}}'s namespace, the
+    admission-controller denies it; zero privileged containers are admitted.
+  steadyState:
+    - source: prometheus
+      query: 'up{job="admission-controller"}'
+      expect: {type: threshold, op: eq, value: 1}
+    - source: prometheus
+      query: 'admission_requests_total{namespace="{{.namespace}}"} > 0'
+      expect: {type: threshold, op: gt, value: 0}
+injection:
+  detonator: k8s
+  mode: inject
+  spec:
+    action: admit-privileged-pod
+    namespace: '{{.namespace}}'
+    dryRun: true
+  duration: "45s"
+  reversible: true
+  revertVerification:
+    source: prometheus
+    query: 'up{job="admission-controller"}'
+    expect: {type: threshold, op: eq, value: 1}
+assertions:
+  - stage: PREVENTED
+    source: k8saudit
+    query: 'namespace="{{.namespace}}" AND security_context="privileged" AND admission_decision="allow"'
+    expect: {type: absent}
+    sloMs: 0
+    requireUuid: false
+    justification: >
+      Asserts the ABSENCE of any admit decision for a privileged container over all admission
+      requests in the window; UUID scoping would miss a real privileged workload being admitted.
+    securityRelevant: true
+  - stage: DETECTED
+    source: prometheus
+    query: 'increase(admission_denied_total{policy="privileged_container"}[2m])'
+    expect: {type: threshold, op: gt, value: 0}
+    sloMs: 60000
+  - stage: ALERTED
+    source: alertmanager
+    query: PrivilegedPodAdmissionAttempt
+    expect: {type: present}
+    sloMs: 300000
+blastRadius:
+  maxPods: 1
+  maxPctReplicas: 5
+  maxDurationSeconds: 60
+  maxTrafficPct: 0
+expectedNoise:
+  - AdmissionWebhookLatency
+promotion:
+  requiresPassIn: [playground, stage, preprod]
+  withinDays: 14
+capabilities: [supplychain-injection, admission-injection, prod-injection]

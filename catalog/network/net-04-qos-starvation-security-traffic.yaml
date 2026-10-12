@@ -1,0 +1,74 @@
+apiVersion: chaos.shoebill.dev/v1alpha1
+kind: SecurityChaosExperiment
+metadata:
+  name: net-04-qos-starvation-security-traffic
+  version: 1
+  title: QoS starvation of security-control traffic
+family: network
+blastRadiusClass: medium
+description: >
+  Saturates the network path for {{.target}} with best-effort traffic and verifies that
+  security-control traffic (authorization calls and audit-log shipping) keeps its QoS
+  guarantee. Starving security traffic under load degrades enforcement and detection.
+controls: [qos-policy, network-policy, detection-rule]
+attackIds: [T1498]
+owaspIds: [API4:2023]
+controlFamilies: [ISO-A.8.6, NIST-SC-5, NIST-SC-6]
+hypothesis:
+  statement: >
+    When the network path for {{.target}} is saturated with best-effort traffic, the
+    security-control QoS class stays within its latency SLO; zero security-control packets are
+    dropped below the guaranteed rate.
+  steadyState:
+    - source: prometheus
+      query: 'qos_security_class_latency_ms{service="{{.target}}"} < 100'
+      expect: {type: threshold, op: lt, value: 100}
+    - source: prometheus
+      query: 'qos_security_class_drops_total{service="{{.target}}"}'
+      expect: {type: present}
+injection:
+  detonator: network
+  mode: inject
+  spec:
+    action: bandwidth-saturation
+    target: '{{.target}}'
+    class: best-effort
+  duration: "60s"
+  reversible: true
+  revertVerification:
+    source: prometheus
+    query: 'qos_security_class_latency_ms{service="{{.target}}"} < 100'
+    expect: {type: threshold, op: lt, value: 100}
+assertions:
+  - stage: PREVENTED
+    source: applog
+    query: 'service="{{.target}}" AND qos_class="security" AND dropped_below_guarantee=true'
+    expect: {type: absent}
+    sloMs: 0
+    requireUuid: false
+    justification: >
+      Asserts the ABSENCE of any security-class packet dropped below its guarantee over all
+      traffic during saturation; UUID scoping would miss real enforcement/detection starvation.
+    securityRelevant: true
+  - stage: DETECTED
+    source: prometheus
+    query: 'increase(qos_security_class_drops_total{service="{{.target}}"}[2m])'
+    expect: {type: threshold, op: eq, value: 0}
+    sloMs: 60000
+  - stage: ALERTED
+    source: alertmanager
+    query: SecurityTrafficStarved
+    expect: {type: present}
+    sloMs: 300000
+blastRadius:
+  maxPods: 1
+  maxPctReplicas: 5
+  maxDurationSeconds: 90
+  maxTrafficPct: 2
+  requiresDistinctFaultDomains: true
+expectedNoise:
+  - NetworkSaturationRate
+promotion:
+  requiresPassIn: [playground, stage, preprod]
+  withinDays: 14
+capabilities: [network-injection, load-injection, prod-injection]

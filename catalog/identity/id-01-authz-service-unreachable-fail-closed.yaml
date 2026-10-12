@@ -1,0 +1,79 @@
+apiVersion: chaos.shoebill.dev/v1alpha1
+kind: SecurityChaosExperiment
+metadata:
+  name: id-01-authz-service-unreachable-fail-closed
+  version: 1
+  title: Authorization service unreachable fails closed
+family: identity
+blastRadiusClass: high
+description: >
+  Blackholes the authorization-service that fronts {{.target}} and verifies the caller path
+  fails CLOSED. Serving a request without a valid authorization decision when the
+  authorization-service is unreachable is a critical FAIL_OPEN.
+controls: [authorization-service, api-gateway, service-mesh]
+attackIds: [T1078.004]
+owaspIds: [API5:2023]
+controlFamilies: [ISO-A.8.5, NIST-AC-3, PCI-DSS-7]
+hypothesis:
+  statement: >
+    When the authorization-service for {{.target}} is unreachable, requests are denied with
+    401/403; zero requests are served 200 without an authorization decision.
+  steadyState:
+    - source: http
+      query: 'GET https://{{.target}}/internal/health'
+      expect: {type: value, op: eq, value: 200}
+    - source: prometheus
+      query: 'sum(rate(gateway_requests_total{service="{{.target}}",code="403"}[5m])) >= 0'
+      expect: {type: threshold, op: gte, value: 0}
+injection:
+  detonator: k8s
+  mode: inject
+  spec:
+    action: dependency-blackhole
+    dependency: authorization-service
+    podCount: 1
+  duration: "60s"
+  reversible: true
+  revertVerification:
+    source: prometheus
+    query: 'up{job="authorization-service"}'
+    expect: {type: threshold, op: eq, value: 1}
+assertions:
+  - stage: PREVENTED
+    source: gwlog
+    query: 'service="{{.target}}" AND authz_decision="none" AND code=200'
+    expect: {type: absent}
+    sloMs: 0
+    requireUuid: false
+    justification: >
+      Fail-open is asserted over ALL traffic during the outage: no request is served without
+      an authorization decision. UUID scoping would miss real fail-open behaviour.
+    securityRelevant: true
+  - stage: DETECTED
+    source: prometheus
+    query: 'increase(authz_service_unreachable_total{service="{{.target}}"}[2m])'
+    expect: {type: threshold, op: gt, value: 0}
+    sloMs: 60000
+  - stage: ALERTED
+    source: alertmanager
+    query: AuthorizationServiceUnreachable
+    expect: {type: present}
+    sloMs: 300000
+  - stage: PAGED
+    source: alertmanager
+    query: AuthorizationServiceUnreachable
+    expect: {type: paged}
+    sloMs: 600000
+blastRadius:
+  maxPods: 1
+  maxPctReplicas: 5
+  maxDurationSeconds: 75
+  maxTrafficPct: 1
+  requiresDistinctFaultDomains: true
+expectedNoise:
+  - UpstreamDependencyErrors
+  - PodContainerRestart
+promotion:
+  requiresPassIn: [playground, stage, preprod]
+  withinDays: 14
+capabilities: [identity-injection, prod-injection]

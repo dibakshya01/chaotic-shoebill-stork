@@ -1,0 +1,78 @@
+apiVersion: chaos.shoebill.dev/v1alpha1
+kind: SecurityChaosExperiment
+metadata:
+  name: dr-02-failover-no-widened-access
+  version: 1
+  title: Failover does not widen access
+family: dr
+blastRadiusClass: high
+description: >
+  Triggers a region failover for {{.target}} and verifies no permissive or break-glass mode is
+  left enabled after cutover. Access that is wider after failover than in steady state is a
+  critical FAIL_OPEN — a permissive mode left behind.
+controls: [authorization-service, service-mesh, network-policy]
+attackIds: [T1562.001]
+owaspIds: [API5:2023]
+controlFamilies: [ISO-A.8.5, NIST-AC-3, NIST-CP-10]
+hypothesis:
+  statement: >
+    After a region failover for {{.target}}, authorization is at least as strict as in steady
+    state; zero requests are allowed post-failover that steady-state policy would deny.
+  steadyState:
+    - source: http
+      query: 'GET https://{{.target}}/internal/health'
+      expect: {type: value, op: eq, value: 200}
+    - source: prometheus
+      query: 'authz_permissive_mode_active_total{service="{{.target}}"}'
+      expect: {type: present}
+injection:
+  detonator: k8s
+  mode: inject
+  spec:
+    action: region-failover-drill
+    target: '{{.target}}'
+    podCount: 1
+  duration: "60s"
+  reversible: true
+  revertVerification:
+    source: prometheus
+    query: 'authz_permissive_mode_active_total{service="{{.target}}"}'
+    expect: {type: threshold, op: eq, value: 0}
+assertions:
+  - stage: PREVENTED
+    source: gwlog
+    query: 'service="{{.target}}" AND phase="post_failover" AND allowed_but_steady_state_denies=true'
+    expect: {type: absent}
+    sloMs: 0
+    requireUuid: false
+    justification: >
+      Fail-open asserted over ALL post-failover traffic: no request is allowed that steady-state
+      policy would deny. UUID scoping would miss a real permissive mode left behind.
+    securityRelevant: true
+  - stage: DETECTED
+    source: prometheus
+    query: 'increase(authz_permissive_mode_active_total{service="{{.target}}"}[2m])'
+    expect: {type: threshold, op: eq, value: 0}
+    sloMs: 60000
+  - stage: ALERTED
+    source: alertmanager
+    query: PermissiveModeAfterFailover
+    expect: {type: present}
+    sloMs: 300000
+  - stage: PAGED
+    source: alertmanager
+    query: PermissiveModeAfterFailover
+    expect: {type: paged}
+    sloMs: 600000
+blastRadius:
+  maxPods: 1
+  maxPctReplicas: 5
+  maxDurationSeconds: 75
+  maxTrafficPct: 1
+  requiresDistinctFaultDomains: true
+expectedNoise:
+  - RegionFailoverActivity
+promotion:
+  requiresPassIn: [playground, stage, preprod]
+  withinDays: 14
+capabilities: [dr-injection, prod-injection]

@@ -1,0 +1,72 @@
+apiVersion: chaos.shoebill.dev/v1alpha1
+kind: SecurityChaosExperiment
+metadata:
+  name: net-05-service-perimeter-deny
+  version: 1
+  title: Service perimeter denies out-of-perimeter call
+family: network
+blastRadiusClass: medium
+description: >
+  Attempts a call from inside the perimeter of {{.target}} to a resource outside the defined
+  service perimeter and verifies it is denied. The perimeter must contain data access to the
+  declared boundary even when a caller is otherwise authenticated.
+controls: [service-perimeter, network-policy, egress-gateway]
+attackIds: [T1530]
+owaspIds: [API8:2023]
+controlFamilies: [ISO-A.8.22, NIST-AC-4, NIST-SC-7]
+hypothesis:
+  statement: >
+    When a caller inside the perimeter of {{.target}} reaches a resource outside the service
+    perimeter, the control denies it; zero out-of-perimeter calls succeed.
+  steadyState:
+    - source: prometheus
+      query: 'sum(rate(perimeter_requests_total{service="{{.target}}",in_perimeter="true",code!~"5.."}[2m])) > 0'
+      expect: {type: threshold, op: gt, value: 0}
+    - source: prometheus
+      query: 'perimeter_denied_total{service="{{.target}}"}'
+      expect: {type: present}
+injection:
+  detonator: network
+  mode: inject
+  spec:
+    action: out-of-perimeter-probe
+    target: '{{.target}}'
+  duration: "45s"
+  reversible: true
+  revertVerification:
+    source: prometheus
+    query: 'up{job="service-perimeter",service="{{.target}}"}'
+    expect: {type: threshold, op: eq, value: 1}
+assertions:
+  - stage: PREVENTED
+    source: applog
+    query: 'service="{{.target}}" AND destination="out_of_perimeter" AND code=200'
+    expect: {type: absent}
+    sloMs: 0
+    requireUuid: false
+    justification: >
+      Asserts the ABSENCE of any successful out-of-perimeter call over all traffic in the
+      window; UUID scoping would miss a real perimeter breach outside synthetic probes.
+    securityRelevant: true
+  - stage: DETECTED
+    source: prometheus
+    query: 'increase(perimeter_denied_total{service="{{.target}}"}[2m])'
+    expect: {type: threshold, op: gt, value: 0}
+    sloMs: 60000
+  - stage: ALERTED
+    source: alertmanager
+    query: ServicePerimeterViolation
+    expect: {type: present}
+    sloMs: 300000
+blastRadius:
+  maxPods: 1
+  maxPctReplicas: 5
+  maxDurationSeconds: 60
+  maxTrafficPct: 1
+  requiresDistinctFaultDomains: true
+expectedNoise:
+  - PerimeterDenyRate
+promotion:
+  requiresPassIn: [playground, stage, preprod]
+  withinDays: 14
+capabilities: [network-injection, prod-injection]

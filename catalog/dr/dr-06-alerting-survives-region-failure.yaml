@@ -1,0 +1,78 @@
+apiVersion: chaos.shoebill.dev/v1alpha1
+kind: SecurityChaosExperiment
+metadata:
+  name: dr-06-alerting-survives-region-failure
+  version: 1
+  title: Alerting survives its own region failure
+family: dr
+blastRadiusClass: high
+description: >
+  Blackholes the region hosting the primary alerting pipeline for {{.target}} and verifies
+  alerts are still generated and delivered from the failover path. Security alerting that dies
+  with its own region leaves detection blind during an incident.
+controls: [alerting-pipeline, detection-rule, paging-service]
+attackIds: [T1562.001]
+owaspIds: [A09:2025]
+controlFamilies: [ISO-A.5.29, NIST-IR-4, NIST-IR-6]
+hypothesis:
+  statement: >
+    When the primary alerting region for {{.target}} is unavailable, fired alerts are still
+    generated and delivered from the failover path; zero fired alerts go undelivered.
+  steadyState:
+    - source: prometheus
+      query: 'up{job="alerting-pipeline"}'
+      expect: {type: threshold, op: eq, value: 1}
+    - source: prometheus
+      query: 'alert_delivery_total{service="{{.target}}"}'
+      expect: {type: present}
+injection:
+  detonator: network
+  mode: inject
+  spec:
+    action: alerting-region-blackhole
+    target: '{{.target}}'
+    region: primary-alerting
+  duration: "60s"
+  reversible: true
+  revertVerification:
+    source: prometheus
+    query: 'up{job="alerting-pipeline"}'
+    expect: {type: threshold, op: eq, value: 1}
+assertions:
+  - stage: PREVENTED
+    source: applog
+    query: 'service="{{.target}}" AND primary_alerting_region="down" AND alert_fired=true AND alert_delivered=false'
+    expect: {type: absent}
+    sloMs: 0
+    requireUuid: false
+    justification: >
+      Asserts the ABSENCE of any fired-but-undelivered alert while the primary alerting region
+      is down, over all alerts in the window; UUID scoping would miss a real delivery gap.
+    securityRelevant: true
+  - stage: DETECTED
+    source: prometheus
+    query: 'increase(alerting_failover_engaged_total{service="{{.target}}"}[2m])'
+    expect: {type: threshold, op: gt, value: 0}
+    sloMs: 60000
+  - stage: ALERTED
+    source: alertmanager
+    query: AlertingRegionFailover
+    expect: {type: present}
+    sloMs: 300000
+  - stage: PAGED
+    source: alertmanager
+    query: AlertingRegionFailover
+    expect: {type: paged}
+    sloMs: 600000
+blastRadius:
+  maxPods: 1
+  maxPctReplicas: 5
+  maxDurationSeconds: 75
+  maxTrafficPct: 1
+  requiresDistinctFaultDomains: true
+expectedNoise:
+  - AlertingPipelineLag
+promotion:
+  requiresPassIn: [playground, stage, preprod]
+  withinDays: 14
+capabilities: [dr-injection, detection-injection, prod-injection]

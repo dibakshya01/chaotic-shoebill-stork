@@ -1,0 +1,72 @@
+apiVersion: chaos.shoebill.dev/v1alpha1
+kind: SecurityChaosExperiment
+metadata:
+  name: gw-08-direct-to-service-bypass-refused
+  version: 1
+  title: Direct-to-service bypass refused
+family: gateway
+blastRadiusClass: medium
+description: >
+  Attempts to reach {{.target}} directly on its service address, bypassing the api-gateway and
+  its authentication. Network policy and mesh authorization must refuse any request that did
+  not transit the gateway.
+controls: [api-gateway, network-policy, service-mesh]
+attackIds: [T1190]
+owaspIds: [API8:2023]
+controlFamilies: [ISO-A.8.22, NIST-SC-7, NIST-AC-4]
+hypothesis:
+  statement: >
+    When a caller reaches {{.target}} directly without transiting the gateway, the request is
+    refused; zero gateway-bypass requests are served.
+  steadyState:
+    - source: prometheus
+      query: 'sum(rate(gateway_requests_total{service="{{.target}}",code!~"5.."}[2m])) > 0'
+      expect: {type: threshold, op: gt, value: 0}
+    - source: prometheus
+      query: 'mesh_authz_denied_total{service="{{.target}}"}'
+      expect: {type: present}
+injection:
+  detonator: network
+  mode: inject
+  spec:
+    action: gateway-bypass-probe
+    target: '{{.target}}'
+  duration: "45s"
+  reversible: true
+  revertVerification:
+    source: prometheus
+    query: 'up{job="sidecar",service="{{.target}}"}'
+    expect: {type: threshold, op: eq, value: 1}
+assertions:
+  - stage: PREVENTED
+    source: gwlog
+    query: 'service="{{.target}}" AND gateway_context=false AND code=200'
+    expect: {type: absent}
+    sloMs: 0
+    requireUuid: false
+    justification: >
+      Asserts the ABSENCE of any served request lacking gateway context over all traffic in
+      the window; UUID scoping would miss a real direct-to-service bypass.
+    securityRelevant: true
+  - stage: DETECTED
+    source: prometheus
+    query: 'increase(mesh_authz_denied_total{service="{{.target}}",reason="missing_gateway_context"}[2m])'
+    expect: {type: threshold, op: gt, value: 0}
+    sloMs: 60000
+  - stage: ALERTED
+    source: alertmanager
+    query: GatewayBypassAttempt
+    expect: {type: present}
+    sloMs: 300000
+blastRadius:
+  maxPods: 1
+  maxPctReplicas: 5
+  maxDurationSeconds: 60
+  maxTrafficPct: 1
+  requiresDistinctFaultDomains: true
+expectedNoise:
+  - MeshAuthzDenyRate
+promotion:
+  requiresPassIn: [playground, stage, preprod]
+  withinDays: 14
+capabilities: [gateway-injection, network-injection, prod-injection]

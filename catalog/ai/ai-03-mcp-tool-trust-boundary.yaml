@@ -1,0 +1,71 @@
+apiVersion: chaos.shoebill.dev/v1alpha1
+kind: SecurityChaosExperiment
+metadata:
+  name: ai-03-mcp-tool-trust-boundary
+  version: 1
+  title: MCP tool trust boundary rejects over-broad schema
+family: ai
+blastRadiusClass: medium
+description: >
+  Attempts to register an MCP tool with an over-broad schema (wildcard scopes or unconstrained
+  parameters) in the registry serving {{.target}}, and verifies registry policy rejects it. An
+  over-broad tool schema widens the agent's reach beyond what policy intends.
+controls: [mcp-server, tool-registry, policy-engine]
+attackIds: [T1195.002]
+owaspIds: [ASI04]
+controlFamilies: [ISO-A.8.28, NIST-CM-7, NIST-SR-3]
+hypothesis:
+  statement: >
+    When an MCP tool with an over-broad schema is submitted to the registry for {{.target}},
+    registry policy rejects it; zero over-broad tool schemas are accepted.
+  steadyState:
+    - source: prometheus
+      query: 'up{job="tool-registry",service="{{.target}}"}'
+      expect: {type: threshold, op: eq, value: 1}
+    - source: prometheus
+      query: 'mcp_tool_registrations_total{service="{{.target}}"} > 0'
+      expect: {type: threshold, op: gt, value: 0}
+injection:
+  detonator: http
+  mode: inject
+  spec:
+    action: overbroad-tool-schema-register
+    target: '{{.target}}'
+  duration: "45s"
+  reversible: true
+  revertVerification:
+    source: prometheus
+    query: 'up{job="tool-registry",service="{{.target}}"}'
+    expect: {type: threshold, op: eq, value: 1}
+assertions:
+  - stage: PREVENTED
+    source: applog
+    query: 'service="{{.target}}" AND tool_schema="over_broad" AND registration_result="accepted"'
+    expect: {type: absent}
+    sloMs: 0
+    requireUuid: false
+    justification: >
+      Asserts the ABSENCE of any over-broad tool schema accepted into the registry over all
+      registration attempts in the window; UUID scoping would miss a real policy bypass.
+    securityRelevant: true
+  - stage: DETECTED
+    source: prometheus
+    query: 'increase(mcp_tool_registration_denied_total{service="{{.target}}",reason="schema_too_broad"}[2m])'
+    expect: {type: threshold, op: gt, value: 0}
+    sloMs: 60000
+  - stage: ALERTED
+    source: alertmanager
+    query: OverbroadToolSchemaRejected
+    expect: {type: present}
+    sloMs: 300000
+blastRadius:
+  maxPods: 1
+  maxPctReplicas: 5
+  maxDurationSeconds: 60
+  maxTrafficPct: 1
+expectedNoise:
+  - ToolRegistryDenyRate
+promotion:
+  requiresPassIn: [playground, stage, preprod]
+  withinDays: 14
+capabilities: [ai-injection, prod-injection]

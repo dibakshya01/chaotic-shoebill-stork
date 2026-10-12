@@ -1,0 +1,71 @@
+apiVersion: chaos.shoebill.dev/v1alpha1
+kind: SecurityChaosExperiment
+metadata:
+  name: ai-04-memory-poisoning
+  version: 1
+  title: Memory poisoning not retrievable across boundaries
+family: ai
+blastRadiusClass: medium
+description: >
+  Writes a poisoned memory entry in one session or tenant of {{.target}} and attempts to
+  retrieve it from another session or tenant, verifying it is isolated. Memory that crosses the
+  session or tenant boundary lets one context poison another.
+controls: [agent-memory-store, agent-guardrail, tenant-isolation]
+attackIds: [T1565.001]
+owaspIds: [ASI06, LLM08:2025]
+controlFamilies: [ISO-A.8.3, NIST-SC-28, NIST-AC-4]
+hypothesis:
+  statement: >
+    When a poisoned memory is written in one session or tenant of {{.target}}, it is not
+    retrievable in another; zero poisoned memories cross the session or tenant boundary.
+  steadyState:
+    - source: http
+      query: 'GET https://{{.target}}/internal/health'
+      expect: {type: value, op: eq, value: 200}
+    - source: prometheus
+      query: 'agent_memory_cross_boundary_denied_total{service="{{.target}}"}'
+      expect: {type: present}
+injection:
+  detonator: http
+  mode: inject
+  spec:
+    action: memory-poison-probe
+    target: '{{.target}}'
+  duration: "60s"
+  reversible: true
+  revertVerification:
+    source: prometheus
+    query: 'up{job="agent-memory-store",service="{{.target}}"}'
+    expect: {type: threshold, op: eq, value: 1}
+assertions:
+  - stage: PREVENTED
+    source: applog
+    query: 'service="{{.target}}" AND memory_origin_scope!=retrieval_scope AND retrieved=true'
+    expect: {type: absent}
+    sloMs: 0
+    requireUuid: false
+    justification: >
+      Asserts the ABSENCE of any cross-session or cross-tenant memory retrieval over all memory
+      reads in the window; UUID scoping would miss a real isolation breach.
+    securityRelevant: true
+  - stage: DETECTED
+    source: prometheus
+    query: 'increase(agent_memory_cross_boundary_denied_total{service="{{.target}}"}[2m])'
+    expect: {type: threshold, op: gt, value: 0}
+    sloMs: 60000
+  - stage: ALERTED
+    source: alertmanager
+    query: MemoryPoisoningAttempt
+    expect: {type: present}
+    sloMs: 300000
+blastRadius:
+  maxPods: 1
+  maxPctReplicas: 5
+  maxDurationSeconds: 75
+  maxTrafficPct: 1
+expectedNoise:
+  - AgentMemoryDenyRate
+promotion:
+  requiresPassIn: [playground, stage, preprod]
+  withinDays: 14
+capabilities: [ai-injection, prod-injection]

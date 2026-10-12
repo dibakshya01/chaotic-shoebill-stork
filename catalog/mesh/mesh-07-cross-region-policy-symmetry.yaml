@@ -1,0 +1,53 @@
+apiVersion: chaos.shoebill.dev/v1alpha1
+kind: SecurityChaosExperiment
+metadata:
+  name: mesh-07-cross-region-policy-symmetry
+  version: 1
+  title: Cross-region mesh policy symmetry
+family: mesh
+blastRadiusClass: low
+description: >
+  A read-only check that the mesh authorization and peer-authentication policy set is
+  symmetric across regions, so a failover region cannot silently run a weaker posture than
+  primary. observe_only — safe to run at any time, including during a freeze window.
+controls: [service-mesh, authorization-policy, peer-authentication]
+attackIds: [T1078]
+owaspIds: [API8:2023]
+controlFamilies: [ISO-A.8.9, NIST-CM-2, NIST-AC-3]
+hypothesis:
+  statement: >
+    The mesh authorization policy set and mTLS mode for {{.target}} are identical across all
+    regions; no region carries a weaker or divergent policy.
+  steadyState:
+    - source: prometheus
+      query: 'mesh_policy_region_divergence_total{service="{{.target}}"} > 0'
+      expect: {type: absent}
+injection:
+  detonator: observe
+  mode: observe_only
+  spec:
+    action: policy-symmetry-diff
+assertions:
+  - stage: PREVENTED
+    source: prometheus
+    query: 'mesh_policy_region_divergence{service="{{.target}}"}'
+    expect: {type: absent}
+    sloMs: 0
+    requireUuid: false
+    justification: >
+      A drift assertion over the whole cross-region policy surface; there is no injected run
+      to correlate a UUID against (observe_only).
+    securityRelevant: true
+  - stage: DETECTED
+    source: prometheus
+    query: 'mesh_policy_replication_lag_seconds{service="{{.target}}"}'
+    expect: {type: threshold, op: lt, value: 60}
+    sloMs: 60000
+blastRadius:
+  maxPods: 0
+  maxPctReplicas: 0
+  maxDurationSeconds: 0
+  maxTrafficPct: 0
+promotion:
+  requiresPassIn: []
+  withinDays: 14

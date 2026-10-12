@@ -1,0 +1,73 @@
+apiVersion: chaos.shoebill.dev/v1alpha1
+kind: SecurityChaosExperiment
+metadata:
+  name: mesh-03-spoofed-workload-identity-denied
+  version: 1
+  title: Spoofed workload identity denied
+family: mesh
+blastRadiusClass: medium
+description: >
+  A canary client presents a forged or mismatched workload identity when calling
+  {{.target}}. The mesh must authenticate the peer identity and deny the call; a spoofed
+  identity must never be served.
+controls: [service-mesh, mtls, workload-identity, authorization-policy]
+attackIds: [T1078]
+owaspIds: [API5:2023]
+controlFamilies: [ISO-A.5.16, NIST-IA-9, NIST-AC-3]
+hypothesis:
+  statement: >
+    When a caller to {{.target}} presents a workload identity that does not match its
+    verified mTLS certificate, the request is denied; zero spoofed-identity requests succeed.
+  steadyState:
+    - source: prometheus
+      query: 'sum(rate(mesh_requests_total{service="{{.target}}",identity_verified="true",code!~"5.."}[2m])) > 0'
+      expect: {type: threshold, op: gt, value: 0}
+    - source: prometheus
+      query: 'mesh_authz_denied_total{service="{{.target}}"}'
+      expect: {type: present}
+injection:
+  detonator: network
+  mode: inject
+  spec:
+    action: spoofed-identity-probe
+    target: '{{.target}}'
+    claimedIdentity: forged
+  duration: "45s"
+  reversible: true
+  revertVerification:
+    source: prometheus
+    query: 'up{job="sidecar",service="{{.target}}"}'
+    expect: {type: threshold, op: eq, value: 1}
+assertions:
+  - stage: PREVENTED
+    source: gwlog
+    query: 'service="{{.target}}" AND identity_mismatch=true AND code=200'
+    expect: {type: absent}
+    sloMs: 0
+    requireUuid: false
+    justification: >
+      Asserts the ABSENCE of any served request whose presented identity did not match its
+      verified certificate, over all traffic during the window rather than synthetic probes.
+    securityRelevant: true
+  - stage: DETECTED
+    source: prometheus
+    query: 'increase(mesh_authz_denied_total{service="{{.target}}",reason="identity_mismatch"}[2m])'
+    expect: {type: threshold, op: gt, value: 0}
+    sloMs: 60000
+  - stage: ALERTED
+    source: alertmanager
+    query: WorkloadIdentitySpoofAttempt
+    expect: {type: present}
+    sloMs: 300000
+blastRadius:
+  maxPods: 1
+  maxPctReplicas: 5
+  maxDurationSeconds: 60
+  maxTrafficPct: 1
+  requiresDistinctFaultDomains: true
+expectedNoise:
+  - MeshAuthzDenyRate
+promotion:
+  requiresPassIn: [playground, stage, preprod]
+  withinDays: 14
+capabilities: [mesh-injection, prod-injection]

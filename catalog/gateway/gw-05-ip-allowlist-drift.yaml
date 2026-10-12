@@ -1,0 +1,53 @@
+apiVersion: chaos.shoebill.dev/v1alpha1
+kind: SecurityChaosExperiment
+metadata:
+  name: gw-05-ip-allowlist-drift
+  version: 1
+  title: IP allowlist drift detection
+family: gateway
+blastRadiusClass: low
+description: >
+  A read-only check that the gateway IP allowlist protecting {{.target}} matches its declared
+  source of truth, so no stale or unexpected entry silently widens who can reach the edge.
+  observe_only — safe to run at any time.
+controls: [api-gateway, ip-allowlist, network-policy]
+attackIds: [T1133]
+owaspIds: [API8:2023]
+controlFamilies: [ISO-A.8.9, NIST-CM-6, NIST-AC-4]
+hypothesis:
+  statement: >
+    The gateway IP allowlist for {{.target}} contains no entry absent from its declared source
+    of truth; there is zero allowlist drift.
+  steadyState:
+    - source: prometheus
+      query: 'gateway_allowlist_drift_total{service="{{.target}}"} > 0'
+      expect: {type: absent}
+injection:
+  detonator: observe
+  mode: observe_only
+  spec:
+    action: allowlist-diff
+assertions:
+  - stage: PREVENTED
+    source: prometheus
+    query: 'gateway_allowlist_entries_unexpected{service="{{.target}}"}'
+    expect: {type: absent}
+    sloMs: 0
+    requireUuid: false
+    justification: >
+      A drift assertion over the whole allowlist surface; there is no injected run to
+      correlate a UUID against (observe_only).
+    securityRelevant: true
+  - stage: DETECTED
+    source: prometheus
+    query: 'gateway_allowlist_last_reconcile_seconds{service="{{.target}}"}'
+    expect: {type: threshold, op: lt, value: 3600}
+    sloMs: 60000
+blastRadius:
+  maxPods: 0
+  maxPctReplicas: 0
+  maxDurationSeconds: 0
+  maxTrafficPct: 0
+promotion:
+  requiresPassIn: []
+  withinDays: 14

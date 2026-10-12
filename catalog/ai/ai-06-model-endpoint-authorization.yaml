@@ -1,0 +1,73 @@
+apiVersion: chaos.shoebill.dev/v1alpha1
+kind: SecurityChaosExperiment
+metadata:
+  name: ai-06-model-endpoint-authorization
+  version: 1
+  title: Model-endpoint authorization denies unauth and cross-tenant
+family: ai
+blastRadiusClass: medium
+description: >
+  Calls the model-serving endpoint behind {{.target}} unauthenticated and with a cross-tenant
+  token, verifying both are denied. An unauthenticated or cross-tenant call served by a model
+  endpoint exposes inference and data across trust boundaries.
+controls: [model-serving, api-gateway, authorization-service]
+attackIds: [T1078]
+owaspIds: [API2:2023]
+controlFamilies: [ISO-A.8.5, NIST-IA-2, NIST-AC-3]
+hypothesis:
+  statement: >
+    When the model endpoint behind {{.target}} is called unauthenticated or with a cross-tenant
+    token, the call is denied; zero unauthenticated or cross-tenant calls are served.
+  steadyState:
+    - source: http
+      query: 'GET https://{{.target}}/internal/health'
+      expect: {type: value, op: eq, value: 200}
+    - source: prometheus
+      query: 'model_endpoint_denied_total{service="{{.target}}"}'
+      expect: {type: present}
+injection:
+  detonator: http
+  mode: inject
+  spec:
+    action: model-endpoint-authz-probe
+    target: '{{.target}}'
+    variants: [unauthenticated, cross-tenant]
+  duration: "45s"
+  reversible: true
+  revertVerification:
+    source: prometheus
+    query: 'up{job="model-serving",service="{{.target}}"}'
+    expect: {type: threshold, op: eq, value: 1}
+assertions:
+  - stage: PREVENTED
+    source: gwlog
+    query: 'service="{{.target}}" AND (auth="none" OR token_tenant!=resource_tenant) AND code=200'
+    expect: {type: absent}
+    sloMs: 0
+    requireUuid: false
+    justification: >
+      Asserts the ABSENCE of any served unauthenticated or cross-tenant model call over all
+      traffic in the window; UUID scoping would miss a real cross-boundary call.
+    securityRelevant: true
+  - stage: DETECTED
+    source: prometheus
+    query: 'increase(model_endpoint_denied_total{service="{{.target}}",reason=~"unauthenticated|tenant_mismatch"}[2m])'
+    expect: {type: threshold, op: gt, value: 0}
+    sloMs: 60000
+  - stage: ALERTED
+    source: alertmanager
+    query: ModelEndpointUnauthorized
+    expect: {type: present}
+    sloMs: 300000
+blastRadius:
+  maxPods: 1
+  maxPctReplicas: 5
+  maxDurationSeconds: 60
+  maxTrafficPct: 1
+  requiresDistinctFaultDomains: true
+expectedNoise:
+  - ModelEndpointDenyRate
+promotion:
+  requiresPassIn: [playground, stage, preprod]
+  withinDays: 14
+capabilities: [ai-injection, prod-injection]

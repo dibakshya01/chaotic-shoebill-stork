@@ -1,0 +1,72 @@
+apiVersion: chaos.shoebill.dev/v1alpha1
+kind: SecurityChaosExperiment
+metadata:
+  name: data-04-dataset-access-control
+  version: 1
+  title: Dataset access control denies under-privileged principal
+family: data
+blastRadiusClass: medium
+description: >
+  An under-privileged principal requests a restricted dataset served by {{.target}} and the
+  access control must deny it. Returning restricted rows to a principal below the required
+  privilege is a data-access authorization failure.
+controls: [data-access-control, authorization-service, iam-policy]
+attackIds: [T1530]
+owaspIds: [API5:2023]
+controlFamilies: [DPDP-S.8, ISO-A.8.3, NIST-AC-3, NIST-AC-6]
+hypothesis:
+  statement: >
+    When an under-privileged principal requests a restricted dataset from {{.target}}, access
+    is denied; zero restricted rows are returned to an under-privileged principal.
+  steadyState:
+    - source: http
+      query: 'GET https://{{.target}}/internal/health'
+      expect: {type: value, op: eq, value: 200}
+    - source: prometheus
+      query: 'dataset_access_denied_total{service="{{.target}}"}'
+      expect: {type: present}
+injection:
+  detonator: http
+  mode: inject
+  spec:
+    action: underprivileged-dataset-probe
+    target: '{{.target}}'
+  duration: "45s"
+  reversible: true
+  revertVerification:
+    source: prometheus
+    query: 'up{job="data-access-control",service="{{.target}}"}'
+    expect: {type: threshold, op: eq, value: 1}
+assertions:
+  - stage: PREVENTED
+    source: applog
+    query: 'service="{{.target}}" AND principal_privilege="insufficient" AND rows_returned>0'
+    expect: {type: absent}
+    sloMs: 0
+    requireUuid: false
+    justification: >
+      Asserts the ABSENCE of any restricted rows returned to an under-privileged principal over
+      all requests in the window; UUID scoping would miss a real over-exposure.
+    securityRelevant: true
+  - stage: DETECTED
+    source: prometheus
+    query: 'increase(dataset_access_denied_total{service="{{.target}}",reason="insufficient_privilege"}[2m])'
+    expect: {type: threshold, op: gt, value: 0}
+    sloMs: 60000
+  - stage: ALERTED
+    source: alertmanager
+    query: DatasetAccessViolation
+    expect: {type: present}
+    sloMs: 300000
+blastRadius:
+  maxPods: 1
+  maxPctReplicas: 5
+  maxDurationSeconds: 60
+  maxTrafficPct: 1
+  requiresDistinctFaultDomains: true
+expectedNoise:
+  - DatasetAccessDenyRate
+promotion:
+  requiresPassIn: [playground, stage, preprod]
+  withinDays: 14
+capabilities: [data-injection, prod-injection]

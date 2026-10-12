@@ -1,0 +1,80 @@
+apiVersion: chaos.shoebill.dev/v1alpha1
+kind: SecurityChaosExperiment
+metadata:
+  name: net-02-dns-integrity-fail-closed
+  version: 1
+  title: DNS integrity — app fails closed on tampered resolution
+family: network
+blastRadiusClass: high
+description: >
+  Sinkholes and NXDOMAINs the resolution of a critical dependency for {{.target}} and verifies
+  the app fails CLOSED. Connecting to an unverified endpoint, or serving stale/insecure
+  results when resolution is tampered, is a critical FAIL_OPEN.
+controls: [dns-resolver, dns-sinkhole, service-mesh]
+attackIds: [T1557, T1071.004]
+owaspIds: [API8:2023]
+controlFamilies: [ISO-A.8.21, NIST-SC-20, NIST-SC-21]
+hypothesis:
+  statement: >
+    When resolution of a dependency of {{.target}} is sinkholed or returns NXDOMAIN, the app
+    fails closed and connects to no unverified endpoint; zero requests are served via a
+    tampered resolution.
+  steadyState:
+    - source: http
+      query: 'GET https://{{.target}}/internal/health'
+      expect: {type: value, op: eq, value: 200}
+    - source: prometheus
+      query: 'dns_resolution_success_total{service="{{.target}}"}'
+      expect: {type: present}
+injection:
+  detonator: dns
+  mode: inject
+  spec:
+    action: dns-sinkhole
+    target: '{{.target}}'
+    response: nxdomain
+  duration: "60s"
+  reversible: true
+  revertVerification:
+    source: prometheus
+    query: 'dns_resolution_success_total{service="{{.target}}"} > 0'
+    expect: {type: threshold, op: gt, value: 0}
+assertions:
+  - stage: PREVENTED
+    source: applog
+    query: 'service="{{.target}}" AND resolution_verified=false AND code=200'
+    expect: {type: absent}
+    sloMs: 0
+    requireUuid: false
+    justification: >
+      Fail-open is asserted over ALL traffic during the DNS tamper: no request is served via an
+      unverified endpoint. UUID scoping would miss a real connection to a sinkhole target.
+    securityRelevant: true
+  - stage: DETECTED
+    source: prometheus
+    query: 'increase(dns_resolution_failures_total{service="{{.target}}"}[2m])'
+    expect: {type: threshold, op: gt, value: 0}
+    sloMs: 60000
+  - stage: ALERTED
+    source: alertmanager
+    query: DnsResolutionFailure
+    expect: {type: present}
+    sloMs: 300000
+  - stage: PAGED
+    source: alertmanager
+    query: DnsResolutionFailure
+    expect: {type: paged}
+    sloMs: 600000
+blastRadius:
+  maxPods: 1
+  maxPctReplicas: 5
+  maxDurationSeconds: 75
+  maxTrafficPct: 1
+  requiresDistinctFaultDomains: true
+expectedNoise:
+  - DnsQueryErrorRate
+  - UpstreamDependencyErrors
+promotion:
+  requiresPassIn: [playground, stage, preprod]
+  withinDays: 14
+capabilities: [network-injection, dns-injection, prod-injection]

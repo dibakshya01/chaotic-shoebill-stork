@@ -1,0 +1,53 @@
+apiVersion: chaos.shoebill.dev/v1alpha1
+kind: SecurityChaosExperiment
+metadata:
+  name: dr-01-posture-survives-failover
+  version: 1
+  title: Security posture survives region failover
+family: dr
+blastRadiusClass: low
+description: >
+  A read-only comparison of the security posture of {{.target}} between its primary and
+  failover regions, so a failover region cannot silently run a weaker posture. observe_only —
+  safe to run at any time, including during a freeze window.
+controls: [service-mesh, authorization-service, detection-rule]
+attackIds: [T1078]
+owaspIds: [API8:2023]
+controlFamilies: [ISO-A.5.29, NIST-CP-2, NIST-CP-10]
+hypothesis:
+  statement: >
+    Every Tier-1 security control present for {{.target}} in the primary region is present and
+    equally strict in the failover region; there is zero posture divergence.
+  steadyState:
+    - source: prometheus
+      query: 'security_posture_divergence_total{service="{{.target}}"} > 0'
+      expect: {type: absent}
+injection:
+  detonator: observe
+  mode: observe_only
+  spec:
+    action: posture-parity-diff
+assertions:
+  - stage: PREVENTED
+    source: prometheus
+    query: 'security_posture_weaker_in_failover{service="{{.target}}"}'
+    expect: {type: absent}
+    sloMs: 0
+    requireUuid: false
+    justification: >
+      A parity assertion over the whole control surface across regions; there is no injected
+      run to correlate a UUID against (observe_only).
+    securityRelevant: true
+  - stage: DETECTED
+    source: prometheus
+    query: 'dr_posture_last_validated_hours{service="{{.target}}"}'
+    expect: {type: threshold, op: lt, value: 24}
+    sloMs: 60000
+blastRadius:
+  maxPods: 0
+  maxPctReplicas: 0
+  maxDurationSeconds: 0
+  maxTrafficPct: 0
+promotion:
+  requiresPassIn: []
+  withinDays: 14

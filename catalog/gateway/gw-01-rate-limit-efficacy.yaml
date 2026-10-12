@@ -1,0 +1,73 @@
+apiVersion: chaos.shoebill.dev/v1alpha1
+kind: SecurityChaosExperiment
+metadata:
+  name: gw-01-rate-limit-efficacy
+  version: 1
+  title: Rate-limit efficacy — 429 engages at threshold
+family: gateway
+blastRadiusClass: medium
+description: >
+  Drives traffic to {{.target}} just above the configured rate-limit threshold and verifies
+  the gateway returns 429 within +/-10% of that threshold. Over-limit requests must not be
+  served a 200.
+controls: [api-gateway, rate-limiter]
+attackIds: [T1498]
+owaspIds: [API4:2023]
+controlFamilies: [ISO-A.8.6, NIST-SC-5]
+hypothesis:
+  statement: >
+    When request volume to {{.target}} crosses the configured rate limit, the gateway sheds
+    the excess with 429 within +/-10% of the threshold; no over-limit request is served 200.
+  steadyState:
+    - source: http
+      query: 'GET https://{{.target}}/internal/health'
+      expect: {type: value, op: eq, value: 200}
+    - source: prometheus
+      query: 'sum(rate(gateway_requests_total{service="{{.target}}"}[1m])) >= 0'
+      expect: {type: threshold, op: gte, value: 0}
+injection:
+  detonator: http
+  mode: inject
+  spec:
+    action: rate-limit-load
+    target: '{{.target}}'
+    ratePctOfLimit: 130
+  duration: "60s"
+  reversible: true
+  revertVerification:
+    source: prometheus
+    query: 'sum(rate(gateway_requests_total{service="{{.target}}",code="429"}[1m]))'
+    expect: {type: threshold, op: eq, value: 0}
+assertions:
+  - stage: PREVENTED
+    source: gwlog
+    query: 'service="{{.target}}" AND over_limit=true AND code=200'
+    expect: {type: absent}
+    sloMs: 0
+    requireUuid: false
+    justification: >
+      Asserts the ABSENCE of any over-limit request served 200 across all traffic in the
+      window; synthetic-only scoping would miss real traffic slipping past the limiter.
+    securityRelevant: true
+  - stage: DETECTED
+    source: prometheus
+    query: 'increase(gateway_rate_limited_total{service="{{.target}}",code="429"}[2m])'
+    expect: {type: threshold, op: gt, value: 0}
+    sloMs: 60000
+  - stage: ALERTED
+    source: alertmanager
+    query: RateLimitEngaged
+    expect: {type: present}
+    sloMs: 300000
+blastRadius:
+  maxPods: 1
+  maxPctReplicas: 5
+  maxDurationSeconds: 75
+  maxTrafficPct: 2
+  requiresDistinctFaultDomains: true
+expectedNoise:
+  - GatewayHighRequestRate
+promotion:
+  requiresPassIn: [playground, stage, preprod]
+  withinDays: 14
+capabilities: [gateway-injection, load-injection, prod-injection]

@@ -1,0 +1,73 @@
+apiVersion: chaos.shoebill.dev/v1alpha1
+kind: SecurityChaosExperiment
+metadata:
+  name: gw-02-bot-management-classification
+  version: 1
+  title: Bot management classifies known-bad automation
+family: gateway
+blastRadiusClass: medium
+description: >
+  Replays traffic bearing known-bad automation fingerprints against {{.target}} and verifies
+  the bot-management control classifies and blocks or challenges it, rather than letting it
+  reach origin as human traffic.
+controls: [api-gateway, bot-management, waf]
+attackIds: [T1596]
+owaspIds: [API4:2023]
+controlFamilies: [ISO-A.8.23, NIST-SC-7, NIST-SI-4]
+hypothesis:
+  statement: >
+    When known-bad automation calls {{.target}}, the bot-management control classifies it as
+    malicious and blocks or challenges it; zero known-bad requests reach origin as allowed.
+  steadyState:
+    - source: http
+      query: 'GET https://{{.target}}/internal/health'
+      expect: {type: value, op: eq, value: 200}
+    - source: prometheus
+      query: 'gateway_bot_classified_total{service="{{.target}}"}'
+      expect: {type: present}
+injection:
+  detonator: http
+  mode: inject
+  spec:
+    action: known-bad-bot-replay
+    target: '{{.target}}'
+    fingerprint: known-bad
+  duration: "45s"
+  reversible: true
+  revertVerification:
+    source: prometheus
+    query: 'up{job="api-gateway",service="{{.target}}"}'
+    expect: {type: threshold, op: eq, value: 1}
+assertions:
+  - stage: PREVENTED
+    source: applog
+    query: 'service="{{.target}}" AND bot_class="known_bad" AND reached_origin=true'
+    expect: {type: absent}
+    sloMs: 0
+    requireUuid: false
+    justification: >
+      Asserts the ABSENCE of any known-bad automation reaching origin as allowed over all
+      traffic in the window; UUID scoping would miss real bot traffic slipping through.
+    securityRelevant: true
+  - stage: DETECTED
+    source: prometheus
+    query: 'increase(gateway_bot_blocked_total{service="{{.target}}",class="known_bad"}[2m])'
+    expect: {type: threshold, op: gt, value: 0}
+    sloMs: 60000
+  - stage: ALERTED
+    source: alertmanager
+    query: KnownBadBotActivity
+    expect: {type: present}
+    sloMs: 300000
+blastRadius:
+  maxPods: 1
+  maxPctReplicas: 5
+  maxDurationSeconds: 60
+  maxTrafficPct: 1
+  requiresDistinctFaultDomains: true
+expectedNoise:
+  - GatewayBotChallengeRate
+promotion:
+  requiresPassIn: [playground, stage, preprod]
+  withinDays: 14
+capabilities: [gateway-injection, prod-injection]

@@ -1,0 +1,80 @@
+apiVersion: chaos.shoebill.dev/v1alpha1
+kind: SecurityChaosExperiment
+metadata:
+  name: data-03-cdc-stream-no-raw-pii
+  version: 1
+  title: CDC stream carries tokens, not raw PII
+family: data
+blastRadiusClass: high
+description: >
+  Injects latency into the tokenization-vault feeding the change-data-capture stream for
+  {{.target}} and verifies every CDC event carries tokens, not raw PII. A CDC event that
+  carries an untokenized PII field is a critical FAIL_OPEN.
+controls: [data-pipeline, change-data-capture, tokenization-vault]
+attackIds: [T1530]
+owaspIds: [API3:2023]
+controlFamilies: [DPDP-S.8, PCI-DSS-3.5, ISO-A.8.11, NIST-SC-28]
+hypothesis:
+  statement: >
+    When the tokenization-vault feeding the {{.target}} CDC stream is slow, CDC events still
+    carry only tokens; zero CDC events carry an untokenized PII field.
+  steadyState:
+    - source: prometheus
+      query: 'sum(rate(cdc_events_total{service="{{.target}}"}[2m])) > 0'
+      expect: {type: threshold, op: gt, value: 0}
+    - source: prometheus
+      query: 'cdc_tokenized_field_total{service="{{.target}}"}'
+      expect: {type: present}
+injection:
+  detonator: k8s
+  mode: inject
+  spec:
+    action: dependency-latency
+    dependency: tokenization-vault
+    latencyMs: 2000
+    podCount: 1
+  duration: "60s"
+  reversible: true
+  revertVerification:
+    source: prometheus
+    query: 'histogram_quantile(0.95, sum(rate(tokenization_latency_seconds_bucket{service="{{.target}}"}[2m])) by (le)) < 0.5'
+    expect: {type: threshold, op: lt, value: 0.5}
+assertions:
+  - stage: PREVENTED
+    source: applog
+    query: 'service="{{.target}}" AND stream="cdc" AND field_tokenized=false AND field_is_pii=true'
+    expect: {type: absent}
+    sloMs: 0
+    requireUuid: false
+    justification: >
+      Fail-open asserted over ALL CDC events during vault latency: no event carries an
+      untokenized PII field. UUID scoping would miss real raw PII entering the stream.
+    securityRelevant: true
+  - stage: DETECTED
+    source: prometheus
+    query: 'increase(cdc_untokenized_field_total{service="{{.target}}"}[2m])'
+    expect: {type: threshold, op: eq, value: 0}
+    sloMs: 60000
+  - stage: ALERTED
+    source: alertmanager
+    query: CdcUntokenizedField
+    expect: {type: present}
+    sloMs: 300000
+  - stage: PAGED
+    source: alertmanager
+    query: CdcUntokenizedField
+    expect: {type: paged}
+    sloMs: 600000
+blastRadius:
+  maxPods: 1
+  maxPctReplicas: 5
+  maxDurationSeconds: 75
+  maxTrafficPct: 1
+  requiresDistinctFaultDomains: true
+expectedNoise:
+  - CdcStreamLag
+  - TokenizationLatencyHigh
+promotion:
+  requiresPassIn: [playground, stage, preprod]
+  withinDays: 14
+capabilities: [data-injection, prod-injection]

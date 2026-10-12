@@ -1,0 +1,53 @@
+apiVersion: chaos.shoebill.dev/v1alpha1
+kind: SecurityChaosExperiment
+metadata:
+  name: det-03-runbook-executability
+  version: 1
+  title: Runbook executability for Tier-1 alerts
+family: detection
+blastRadiusClass: low
+description: >
+  A read-only game-day check that every Tier-1 alert covering {{.target}} has a current,
+  executable runbook linked to it. A Tier-1 alert with no current runbook slows response when
+  it matters most. observe_only — safe to run at any time.
+controls: [runbook, incident-response, detection-rule]
+attackIds: [T1562.001]
+owaspIds: [A09:2025]
+controlFamilies: [ISO-A.5.26, NIST-IR-4, NIST-IR-8]
+hypothesis:
+  statement: >
+    Every Tier-1 alert covering {{.target}} links to a current, executable runbook; zero Tier-1
+    alerts lack one.
+  steadyState:
+    - source: prometheus
+      query: 'runbook_missing_total{tier="1",service="{{.target}}"} > 0'
+      expect: {type: absent}
+injection:
+  detonator: observe
+  mode: observe_only
+  spec:
+    action: runbook-audit
+assertions:
+  - stage: PREVENTED
+    source: prometheus
+    query: 'runbook_missing{tier="1",service="{{.target}}"}'
+    expect: {type: absent}
+    sloMs: 0
+    requireUuid: false
+    justification: >
+      A coverage assertion over all Tier-1 alerts; there is no injected run to correlate a UUID
+      against (observe_only).
+    securityRelevant: true
+  - stage: DETECTED
+    source: prometheus
+    query: 'runbook_last_validated_days{tier="1",service="{{.target}}"}'
+    expect: {type: threshold, op: lt, value: 90}
+    sloMs: 60000
+blastRadius:
+  maxPods: 0
+  maxPctReplicas: 0
+  maxDurationSeconds: 0
+  maxTrafficPct: 0
+promotion:
+  requiresPassIn: []
+  withinDays: 14

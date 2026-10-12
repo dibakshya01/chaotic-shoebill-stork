@@ -1,0 +1,73 @@
+apiVersion: chaos.shoebill.dev/v1alpha1
+kind: SecurityChaosExperiment
+metadata:
+  name: gw-09-rate-limit-misconfig-guard
+  version: 1
+  title: Rate-limit misconfig guard — no premature 429
+family: gateway
+blastRadiusClass: low
+description: >
+  A regression guard against an over-tight rate limit. Drives legitimate traffic to
+  {{.target}} up to 1.2x projected peak and verifies the gateway does NOT shed it with 429.
+  A limiter that denies legitimate load is a self-inflicted availability failure.
+controls: [api-gateway, rate-limiter]
+attackIds: [T1498]
+owaspIds: [API4:2023]
+controlFamilies: [ISO-A.8.6, NIST-SC-5, SOC2-A1.1]
+hypothesis:
+  statement: >
+    When legitimate traffic to {{.target}} stays at or below 1.2x projected peak, the gateway
+    serves it without rate limiting; zero below-peak requests receive a 429.
+  steadyState:
+    - source: http
+      query: 'GET https://{{.target}}/internal/health'
+      expect: {type: value, op: eq, value: 200}
+    - source: prometheus
+      query: 'sum(rate(gateway_requests_total{service="{{.target}}"}[1m])) >= 0'
+      expect: {type: threshold, op: gte, value: 0}
+injection:
+  detonator: http
+  mode: inject
+  spec:
+    action: peak-load-replay
+    target: '{{.target}}'
+    ratePctOfProjectedPeak: 120
+  duration: "60s"
+  reversible: true
+  revertVerification:
+    source: prometheus
+    query: 'up{job="api-gateway",service="{{.target}}"}'
+    expect: {type: threshold, op: eq, value: 1}
+assertions:
+  - stage: PREVENTED
+    source: gwlog
+    query: 'service="{{.target}}" AND below_projected_peak=true AND code=429'
+    expect: {type: absent}
+    sloMs: 0
+    requireUuid: false
+    justification: >
+      Asserts the ABSENCE of any below-peak legitimate request shed with 429 over all traffic
+      in the window; synthetic-only scoping would miss real users being denied by a bad limit.
+    securityRelevant: true
+  - stage: DETECTED
+    source: prometheus
+    query: 'increase(gateway_rate_limited_total{service="{{.target}}",code="429"}[2m])'
+    expect: {type: threshold, op: eq, value: 0}
+    sloMs: 60000
+  - stage: ALERTED
+    source: alertmanager
+    query: RateLimitMisconfigured
+    expect: {type: present}
+    sloMs: 300000
+blastRadius:
+  maxPods: 1
+  maxPctReplicas: 5
+  maxDurationSeconds: 75
+  maxTrafficPct: 2
+  requiresDistinctFaultDomains: true
+expectedNoise:
+  - GatewayHighRequestRate
+promotion:
+  requiresPassIn: [playground, stage, preprod]
+  withinDays: 14
+capabilities: [gateway-injection, load-injection, prod-injection]

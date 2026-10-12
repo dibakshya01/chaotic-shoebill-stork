@@ -1,0 +1,71 @@
+apiVersion: chaos.shoebill.dev/v1alpha1
+kind: SecurityChaosExperiment
+metadata:
+  name: sc-03-pipeline-tamper-detection
+  version: 1
+  title: Pipeline tamper detection on digest mismatch
+family: supplychain
+blastRadiusClass: medium
+description: >
+  Presents the deploy gate for {{.target}} with an artifact whose digest does not match its
+  signed attestation and verifies the gate blocks promotion. Promoting an artifact whose digest
+  no longer matches its provenance admits a tampered build.
+controls: [ci-pipeline, artifact-registry, attestation-service]
+attackIds: [T1574]
+owaspIds: [A08:2025]
+controlFamilies: [ISO-A.8.28, NIST-SR-4, NIST-SI-7]
+hypothesis:
+  statement: >
+    When an artifact for {{.target}} has a digest that differs from its signed attestation, the
+    deploy gate blocks it; zero digest-mismatched artifacts are promoted.
+  steadyState:
+    - source: prometheus
+      query: 'up{job="attestation-service"}'
+      expect: {type: threshold, op: eq, value: 1}
+    - source: prometheus
+      query: 'attestation_verifications_total{service="{{.target}}"} > 0'
+      expect: {type: threshold, op: gt, value: 0}
+injection:
+  detonator: exec
+  mode: inject
+  spec:
+    action: digest-mismatch-inject
+    target: '{{.target}}'
+  duration: "45s"
+  reversible: true
+  revertVerification:
+    source: prometheus
+    query: 'up{job="attestation-service"}'
+    expect: {type: threshold, op: eq, value: 1}
+assertions:
+  - stage: PREVENTED
+    source: applog
+    query: 'service="{{.target}}" AND digest_matches_attestation=false AND promoted=true'
+    expect: {type: absent}
+    sloMs: 0
+    requireUuid: false
+    justification: >
+      Asserts the ABSENCE of any promotion of a digest-mismatched artifact over all gate
+      evaluations in the window; UUID scoping would miss a real tampered build being promoted.
+    securityRelevant: true
+  - stage: DETECTED
+    source: prometheus
+    query: 'increase(attestation_verification_failed_total{service="{{.target}}",reason="digest_mismatch"}[2m])'
+    expect: {type: threshold, op: gt, value: 0}
+    sloMs: 60000
+  - stage: ALERTED
+    source: alertmanager
+    query: ArtifactDigestMismatch
+    expect: {type: present}
+    sloMs: 300000
+blastRadius:
+  maxPods: 0
+  maxPctReplicas: 0
+  maxDurationSeconds: 60
+  maxTrafficPct: 0
+expectedNoise:
+  - PipelineGateLatency
+promotion:
+  requiresPassIn: [playground, stage, preprod]
+  withinDays: 14
+capabilities: [supplychain-injection, pipeline-injection, prod-injection]

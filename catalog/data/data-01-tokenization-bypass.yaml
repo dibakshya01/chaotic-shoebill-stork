@@ -1,0 +1,80 @@
+apiVersion: chaos.shoebill.dev/v1alpha1
+kind: SecurityChaosExperiment
+metadata:
+  name: data-01-tokenization-bypass
+  version: 1
+  title: Tokenization bypass under vault degradation
+family: data
+blastRadiusClass: high
+description: >
+  Degrades the tokenization-vault that {{.target}} depends on and verifies raw PII never
+  reaches the datastore, the logs, or the event stream. Persisting or emitting raw PII when
+  the vault is degraded is a critical FAIL_OPEN of data protection.
+controls: [tokenization-vault, data-pipeline, api-gateway]
+attackIds: [T1530]
+owaspIds: [API3:2023]
+controlFamilies: [DPDP-S.8, PCI-DSS-3.5, ISO-A.8.11, NIST-SC-28]
+hypothesis:
+  statement: >
+    When the tokenization-vault for {{.target}} is degraded, the write path either tokenizes
+    or fails closed; zero records containing raw PII reach the store, logs, or stream.
+  steadyState:
+    - source: http
+      query: 'GET https://{{.target}}/internal/health'
+      expect: {type: value, op: eq, value: 200}
+    - source: prometheus
+      query: 'tokenization_success_total{service="{{.target}}"}'
+      expect: {type: present}
+injection:
+  detonator: k8s
+  mode: inject
+  spec:
+    action: dependency-degrade
+    dependency: tokenization-vault
+    podCount: 1
+  duration: "60s"
+  reversible: true
+  revertVerification:
+    source: prometheus
+    query: 'up{job="tokenization-vault"}'
+    expect: {type: threshold, op: eq, value: 1}
+assertions:
+  - stage: PREVENTED
+    source: applog
+    query: 'service="{{.target}}" AND sink=~"store|log|stream" AND raw_pii_detected=true'
+    expect: {type: absent}
+    sloMs: 0
+    requireUuid: false
+    justification: >
+      Critical fail-open asserted over ALL records written during vault degradation, across
+      store, logs, and stream; UUID scoping would miss real raw PII leaking outside synthetic
+      traffic.
+    securityRelevant: true
+  - stage: DETECTED
+    source: prometheus
+    query: 'increase(tokenization_failures_total{service="{{.target}}"}[2m])'
+    expect: {type: threshold, op: gt, value: 0}
+    sloMs: 60000
+  - stage: ALERTED
+    source: alertmanager
+    query: TokenizationVaultDegraded
+    expect: {type: present}
+    sloMs: 300000
+  - stage: PAGED
+    source: alertmanager
+    query: TokenizationVaultDegraded
+    expect: {type: paged}
+    sloMs: 600000
+blastRadius:
+  maxPods: 1
+  maxPctReplicas: 5
+  maxDurationSeconds: 75
+  maxTrafficPct: 1
+  requiresDistinctFaultDomains: true
+expectedNoise:
+  - TokenizationLatencyHigh
+  - UpstreamDependencyErrors
+promotion:
+  requiresPassIn: [playground, stage, preprod]
+  withinDays: 14
+capabilities: [data-injection, prod-injection]

@@ -1,0 +1,53 @@
+apiVersion: chaos.shoebill.dev/v1alpha1
+kind: SecurityChaosExperiment
+metadata:
+  name: dr-05-config-locality
+  version: 1
+  title: Security config has no cross-region dependency
+family: dr
+blastRadiusClass: low
+description: >
+  A read-only check that the security configuration for {{.target}} in each region has no hard
+  dependency on another region, so a region failure cannot disable security config elsewhere.
+  observe_only — safe to run at any time.
+controls: [config-service, service-mesh, authorization-service]
+attackIds: [T1562.001]
+owaspIds: [API8:2023]
+controlFamilies: [ISO-A.8.9, NIST-CM-2, NIST-CP-2]
+hypothesis:
+  statement: >
+    The security configuration for {{.target}} in each region resolves entirely within that
+    region; there are zero cross-region security-config dependencies.
+  steadyState:
+    - source: prometheus
+      query: 'security_config_cross_region_dependency_total{service="{{.target}}"} > 0'
+      expect: {type: absent}
+injection:
+  detonator: observe
+  mode: observe_only
+  spec:
+    action: config-dependency-diff
+assertions:
+  - stage: PREVENTED
+    source: prometheus
+    query: 'security_config_cross_region_dependency{service="{{.target}}"}'
+    expect: {type: absent}
+    sloMs: 0
+    requireUuid: false
+    justification: >
+      A locality assertion over the whole security-config dependency graph; there is no injected
+      run to correlate a UUID against (observe_only).
+    securityRelevant: true
+  - stage: DETECTED
+    source: prometheus
+    query: 'config_locality_last_audited_hours{service="{{.target}}"}'
+    expect: {type: threshold, op: lt, value: 24}
+    sloMs: 60000
+blastRadius:
+  maxPods: 0
+  maxPctReplicas: 0
+  maxDurationSeconds: 0
+  maxTrafficPct: 0
+promotion:
+  requiresPassIn: []
+  withinDays: 14

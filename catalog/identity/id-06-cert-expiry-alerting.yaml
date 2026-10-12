@@ -1,0 +1,72 @@
+apiVersion: chaos.shoebill.dev/v1alpha1
+kind: SecurityChaosExperiment
+metadata:
+  name: id-06-cert-expiry-alerting
+  version: 1
+  title: Certificate expiry alerting fires at lead time
+family: identity
+blastRadiusClass: low
+description: >
+  Issues {{.target}} a short-lived certificate that crosses the expiry-warning lead-time
+  window and verifies the cert-expiry monitor raises an alert before expiry. A certificate
+  that reaches its lead-time window unalerted is a detective-control gap.
+controls: [certificate-authority, cert-expiry-monitor, detection-rule]
+attackIds: [T1557]
+owaspIds: [API8:2023]
+controlFamilies: [NIST-SC-12, ISO-A.8.16, SOC2-CC7.2]
+hypothesis:
+  statement: >
+    When a certificate for {{.target}} enters the expiry-warning lead-time window, the monitor
+    raises an alert before expiry; zero certs reach the lead-time window unalerted.
+  steadyState:
+    - source: prometheus
+      query: 'up{job="cert-expiry-monitor"}'
+      expect: {type: threshold, op: eq, value: 1}
+    - source: prometheus
+      query: 'cert_expiry_days{service="{{.target}}"}'
+      expect: {type: present}
+injection:
+  detonator: cert
+  mode: inject
+  spec:
+    action: cert-expiry-simulate
+    target: '{{.target}}'
+    remainingDaysBelowLeadTime: true
+  duration: "60s"
+  reversible: true
+  revertVerification:
+    source: prometheus
+    query: 'up{job="cert-expiry-monitor"}'
+    expect: {type: threshold, op: eq, value: 1}
+assertions:
+  - stage: PREVENTED
+    source: prometheus
+    query: 'cert_expiring_unalerted_total{service="{{.target}}"}'
+    expect: {type: absent}
+    sloMs: 0
+    requireUuid: false
+    justification: >
+      Asserts the ABSENCE of any certificate inside its lead-time window without an active
+      alert, over the whole cert inventory; there is no synthetic subset to scope by UUID.
+    securityRelevant: true
+  - stage: DETECTED
+    source: prometheus
+    query: 'increase(cert_expiry_warning_total{service="{{.target}}"}[2m])'
+    expect: {type: threshold, op: gt, value: 0}
+    sloMs: 60000
+  - stage: ALERTED
+    source: alertmanager
+    query: CertificateExpiringSoon
+    expect: {type: present}
+    sloMs: 300000
+blastRadius:
+  maxPods: 1
+  maxPctReplicas: 5
+  maxDurationSeconds: 90
+  maxTrafficPct: 1
+expectedNoise:
+  - CertRotationActivity
+promotion:
+  requiresPassIn: [playground, stage, preprod]
+  withinDays: 14
+capabilities: [identity-injection, cert-injection, prod-injection]

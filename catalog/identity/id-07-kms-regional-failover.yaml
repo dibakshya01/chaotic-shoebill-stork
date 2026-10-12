@@ -1,0 +1,80 @@
+apiVersion: chaos.shoebill.dev/v1alpha1
+kind: SecurityChaosExperiment
+metadata:
+  name: id-07-kms-regional-failover
+  version: 1
+  title: KMS regional failover never falls back to plaintext
+family: identity
+blastRadiusClass: high
+description: >
+  Fails the regional KMS endpoint and verifies that envelope-encryption operations for
+  {{.target}} either use the failover region's key material or fail CLOSED. Writing or
+  serving data in PLAINTEXT when the regional KMS is unavailable is a critical FAIL_OPEN.
+controls: [kms, key-management, envelope-encryption]
+attackIds: [T1552]
+owaspIds: [API8:2023]
+controlFamilies: [ISO-A.8.24, NIST-SC-12, NIST-SC-13, PCI-DSS-3.6]
+hypothesis:
+  statement: >
+    When the regional KMS endpoint used by {{.target}} is unreachable, no object is written
+    or served in plaintext; cryptographic operations use failover keys or are denied.
+  steadyState:
+    - source: prometheus
+      query: 'sum(rate(kms_encrypt_requests_total{service="{{.target}}",code="200"}[2m])) > 0'
+      expect: {type: threshold, op: gt, value: 0}
+    - source: prometheus
+      query: 'crypto_fail_closed_total{service="{{.target}}"}'
+      expect: {type: present}
+injection:
+  detonator: network
+  mode: inject
+  spec:
+    action: dependency-blackhole
+    dependency: kms
+    scope: regional-endpoint
+    podCount: 1
+  duration: "60s"
+  reversible: true
+  revertVerification:
+    source: prometheus
+    query: 'up{job="kms",service="{{.target}}"}'
+    expect: {type: threshold, op: eq, value: 1}
+assertions:
+  - stage: PREVENTED
+    source: applog
+    query: 'service="{{.target}}" AND storage_write=true AND encryption="plaintext"'
+    expect: {type: absent}
+    sloMs: 0
+    requireUuid: false
+    justification: >
+      Fail-open is asserted over ALL write/serve operations during the KMS outage, not only
+      synthetic traffic; a UUID-scoped check would miss real plaintext fallback.
+    securityRelevant: true
+  - stage: DETECTED
+    source: prometheus
+    query: 'increase(kms_regional_failover_total{service="{{.target}}"}[2m])'
+    expect: {type: threshold, op: gt, value: 0}
+    sloMs: 60000
+  - stage: ALERTED
+    source: alertmanager
+    query: KmsRegionalFailure
+    expect: {type: present}
+    sloMs: 300000
+  - stage: PAGED
+    source: alertmanager
+    query: KmsRegionalFailure
+    expect: {type: paged}
+    sloMs: 600000
+blastRadius:
+  maxPods: 1
+  maxPctReplicas: 5
+  maxDurationSeconds: 75
+  maxTrafficPct: 1
+  requiresDistinctFaultDomains: true
+expectedNoise:
+  - KmsLatencyHigh
+  - UpstreamDependencyErrors
+promotion:
+  requiresPassIn: [playground, stage, preprod]
+  withinDays: 14
+capabilities: [identity-injection, crypto-injection, prod-injection]

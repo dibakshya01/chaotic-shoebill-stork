@@ -1,0 +1,72 @@
+apiVersion: chaos.shoebill.dev/v1alpha1
+kind: SecurityChaosExperiment
+metadata:
+  name: det-01-tier1-detection-rule-regression
+  version: 1
+  title: Tier-1 detection-rule regression suite
+family: detection
+blastRadiusClass: medium
+description: >
+  Replays a synthetic matching event for each Tier-1 detection-rule covering {{.target}} and
+  verifies every rule still fires. A Tier-1 rule that silently stops firing is an undetected
+  gap in coverage.
+controls: [detection-rule, siem, log-pipeline]
+attackIds: [T1562.001]
+owaspIds: [A09:2025]
+controlFamilies: [ISO-A.8.16, NIST-SI-4, NIST-AU-6]
+hypothesis:
+  statement: >
+    When a synthetic matching event is replayed for each Tier-1 detection rule covering
+    {{.target}}, every rule fires; zero Tier-1 rules fail to fire on their known-matching event.
+  steadyState:
+    - source: prometheus
+      query: 'up{job="siem"}'
+      expect: {type: threshold, op: eq, value: 1}
+    - source: prometheus
+      query: 'detection_rules_loaded_total{tier="1"} > 0'
+      expect: {type: threshold, op: gt, value: 0}
+injection:
+  detonator: exec
+  mode: inject
+  spec:
+    action: detection-rule-replay
+    target: '{{.target}}'
+    tier: "1"
+  duration: "60s"
+  reversible: true
+  revertVerification:
+    source: prometheus
+    query: 'up{job="siem"}'
+    expect: {type: threshold, op: eq, value: 1}
+assertions:
+  - stage: PREVENTED
+    source: prometheus
+    query: 'detection_rule_silent_total{tier="1",service="{{.target}}"}'
+    expect: {type: absent}
+    sloMs: 0
+    requireUuid: false
+    justification: >
+      Asserts the ABSENCE of any Tier-1 rule that failed to fire on its known-matching event,
+      over the whole rule set; there is no synthetic subset to scope by UUID.
+    securityRelevant: true
+  - stage: DETECTED
+    source: prometheus
+    query: 'increase(detection_rule_fired_total{tier="1",service="{{.target}}"}[2m])'
+    expect: {type: threshold, op: gt, value: 0}
+    sloMs: 60000
+  - stage: ALERTED
+    source: alertmanager
+    query: DetectionRuleRegression
+    expect: {type: present}
+    sloMs: 300000
+blastRadius:
+  maxPods: 1
+  maxPctReplicas: 5
+  maxDurationSeconds: 75
+  maxTrafficPct: 0
+expectedNoise:
+  - SyntheticDetectionReplay
+promotion:
+  requiresPassIn: [playground, stage, preprod]
+  withinDays: 14
+capabilities: [detection-injection, prod-injection]

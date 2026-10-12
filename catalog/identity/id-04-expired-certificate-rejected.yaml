@@ -1,0 +1,72 @@
+apiVersion: chaos.shoebill.dev/v1alpha1
+kind: SecurityChaosExperiment
+metadata:
+  name: id-04-expired-certificate-rejected
+  version: 1
+  title: Expired certificate rejected, no silent downgrade
+family: identity
+blastRadiusClass: medium
+description: >
+  Presents an expired client certificate to {{.target}} and verifies the mesh rejects the
+  handshake rather than silently downgrading to plaintext. An expired cert accepted, or a
+  silent downgrade, breaks peer authentication.
+controls: [mtls, certificate-authority, service-mesh]
+attackIds: [T1557]
+owaspIds: [API8:2023]
+controlFamilies: [ISO-A.8.24, NIST-SC-12, NIST-SC-17]
+hypothesis:
+  statement: >
+    When a client presents an expired certificate to {{.target}}, the mesh rejects the
+    handshake and does not downgrade to plaintext; zero expired-cert sessions are served.
+  steadyState:
+    - source: prometheus
+      query: 'sum(rate(mesh_requests_total{service="{{.target}}",mtls="true",code!~"5.."}[2m])) > 0'
+      expect: {type: threshold, op: gt, value: 0}
+    - source: prometheus
+      query: 'mesh_cert_validation_failed_total{service="{{.target}}"}'
+      expect: {type: present}
+injection:
+  detonator: cert
+  mode: inject
+  spec:
+    action: expired-cert-probe
+    target: '{{.target}}'
+  duration: "45s"
+  reversible: true
+  revertVerification:
+    source: prometheus
+    query: 'up{job="sidecar",service="{{.target}}"}'
+    expect: {type: threshold, op: eq, value: 1}
+assertions:
+  - stage: PREVENTED
+    source: gwlog
+    query: 'service="{{.target}}" AND cert_state="expired" AND (code=200 OR transport="plaintext")'
+    expect: {type: absent}
+    sloMs: 0
+    requireUuid: false
+    justification: >
+      Asserts the ABSENCE of any served session on an expired cert or any downgrade to
+      plaintext, over all traffic in the window; UUID scoping would miss a real downgrade.
+    securityRelevant: true
+  - stage: DETECTED
+    source: prometheus
+    query: 'increase(mesh_cert_validation_failed_total{service="{{.target}}",reason="expired"}[2m])'
+    expect: {type: threshold, op: gt, value: 0}
+    sloMs: 60000
+  - stage: ALERTED
+    source: alertmanager
+    query: ExpiredCertRejected
+    expect: {type: present}
+    sloMs: 300000
+blastRadius:
+  maxPods: 1
+  maxPctReplicas: 5
+  maxDurationSeconds: 60
+  maxTrafficPct: 1
+  requiresDistinctFaultDomains: true
+expectedNoise:
+  - CertValidationFailureRate
+promotion:
+  requiresPassIn: [playground, stage, preprod]
+  withinDays: 14
+capabilities: [identity-injection, cert-injection, prod-injection]

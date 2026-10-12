@@ -1,0 +1,71 @@
+apiVersion: chaos.shoebill.dev/v1alpha1
+kind: SecurityChaosExperiment
+metadata:
+  name: dr-03-break-glass-hygiene
+  version: 1
+  title: Break-glass credential hygiene
+family: dr
+blastRadiusClass: medium
+description: >
+  Activates a break-glass credential for {{.target}} and verifies it is auto-revoked at its TTL
+  and that activation is alerted. A break-glass credential that outlives its TTL, or activates
+  silently, is a standing privileged-access risk.
+controls: [break-glass-access, authorization-service, detection-rule]
+attackIds: [T1078]
+owaspIds: [API2:2023]
+controlFamilies: [ISO-A.5.18, NIST-AC-2, SOC2-CC6.2]
+hypothesis:
+  statement: >
+    When a break-glass credential for {{.target}} is activated, it is alerted immediately and
+    auto-revoked at its TTL; zero break-glass credentials remain valid past their TTL.
+  steadyState:
+    - source: prometheus
+      query: 'up{job="break-glass-controller"}'
+      expect: {type: threshold, op: eq, value: 1}
+    - source: prometheus
+      query: 'break_glass_active_total{service="{{.target}}"}'
+      expect: {type: present}
+injection:
+  detonator: http
+  mode: inject
+  spec:
+    action: break-glass-activate
+    target: '{{.target}}'
+  duration: "60s"
+  reversible: true
+  revertVerification:
+    source: prometheus
+    query: 'break_glass_active_total{service="{{.target}}"}'
+    expect: {type: threshold, op: eq, value: 0}
+assertions:
+  - stage: PREVENTED
+    source: applog
+    query: 'service="{{.target}}" AND credential="break_glass" AND valid_past_ttl=true'
+    expect: {type: absent}
+    sloMs: 0
+    requireUuid: false
+    justification: >
+      Asserts the ABSENCE of any break-glass credential valid past its TTL over all activations
+      in the window; UUID scoping would miss a real credential that was not auto-revoked.
+    securityRelevant: true
+  - stage: DETECTED
+    source: prometheus
+    query: 'increase(break_glass_activation_total{service="{{.target}}"}[2m])'
+    expect: {type: threshold, op: gt, value: 0}
+    sloMs: 60000
+  - stage: ALERTED
+    source: alertmanager
+    query: BreakGlassActivated
+    expect: {type: present}
+    sloMs: 300000
+blastRadius:
+  maxPods: 1
+  maxPctReplicas: 5
+  maxDurationSeconds: 75
+  maxTrafficPct: 1
+expectedNoise:
+  - BreakGlassControllerHeartbeat
+promotion:
+  requiresPassIn: [playground, stage, preprod]
+  withinDays: 14
+capabilities: [dr-injection, identity-injection, prod-injection]

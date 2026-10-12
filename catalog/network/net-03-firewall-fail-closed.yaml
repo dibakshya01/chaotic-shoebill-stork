@@ -1,0 +1,79 @@
+apiVersion: chaos.shoebill.dev/v1alpha1
+kind: SecurityChaosExperiment
+metadata:
+  name: net-03-firewall-fail-closed
+  version: 1
+  title: Firewall fails closed on control-plane loss
+family: network
+blastRadiusClass: high
+description: >
+  Kills the firewall enforcement agent protecting {{.target}} and verifies the default posture
+  becomes DENY. A firewall whose agent failure leaves traffic flowing allow-all is a critical
+  FAIL_OPEN of perimeter enforcement.
+controls: [firewall, network-policy]
+attackIds: [T1562.004]
+owaspIds: [API8:2023]
+controlFamilies: [ISO-A.8.20, NIST-SC-7, PCI-DSS-1]
+hypothesis:
+  statement: >
+    When the firewall enforcement agent for {{.target}} fails, previously-denied traffic stays
+    denied; zero previously-blocked flows are admitted during the outage.
+  steadyState:
+    - source: prometheus
+      query: 'sum(rate(network_flows_total{service="{{.target}}",allowed="true"}[2m])) > 0'
+      expect: {type: threshold, op: gt, value: 0}
+    - source: prometheus
+      query: 'up{job="firewall-agent",service="{{.target}}"}'
+      expect: {type: threshold, op: eq, value: 1}
+injection:
+  detonator: k8s
+  mode: inject
+  spec:
+    action: container-kill
+    container: firewall-agent
+    podCount: 1
+  duration: "60s"
+  reversible: true
+  revertVerification:
+    source: prometheus
+    query: 'up{job="firewall-agent",service="{{.target}}"}'
+    expect: {type: threshold, op: eq, value: 1}
+assertions:
+  - stage: PREVENTED
+    source: applog
+    query: 'service="{{.target}}" AND policy_default="deny" AND flow_admitted=true'
+    expect: {type: absent}
+    sloMs: 0
+    requireUuid: false
+    justification: >
+      Fail-open is asserted over ALL flows during the agent outage: no previously-denied flow
+      is admitted. UUID scoping would miss a real allow-all fallback.
+    securityRelevant: true
+  - stage: DETECTED
+    source: prometheus
+    query: 'increase(firewall_agent_unhealthy_total{service="{{.target}}"}[2m])'
+    expect: {type: threshold, op: gt, value: 0}
+    sloMs: 60000
+  - stage: ALERTED
+    source: alertmanager
+    query: FirewallAgentDown
+    expect: {type: present}
+    sloMs: 300000
+  - stage: PAGED
+    source: alertmanager
+    query: FirewallAgentDown
+    expect: {type: paged}
+    sloMs: 600000
+blastRadius:
+  maxPods: 1
+  maxPctReplicas: 5
+  maxDurationSeconds: 75
+  maxTrafficPct: 1
+  requiresDistinctFaultDomains: true
+expectedNoise:
+  - PodContainerRestart
+  - NetworkPolicyDenyRate
+promotion:
+  requiresPassIn: [playground, stage, preprod]
+  withinDays: 14
+capabilities: [network-injection, prod-injection]

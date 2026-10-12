@@ -1,0 +1,72 @@
+apiVersion: chaos.shoebill.dev/v1alpha1
+kind: SecurityChaosExperiment
+metadata:
+  name: sc-01-unsigned-image-admission-denied
+  version: 1
+  title: Unsigned image admission denied
+family: supplychain
+blastRadiusClass: medium
+description: >
+  Submits an unsigned (or signature-invalid) container image for admission to the namespace of
+  {{.target}} and verifies the admission-controller denies it. Admitting an unsigned image
+  breaks the deployment integrity chain.
+controls: [admission-controller, image-signing, policy-engine]
+attackIds: [T1610]
+owaspIds: [A08:2025]
+controlFamilies: [ISO-A.8.28, NIST-CM-14, NIST-SR-11]
+hypothesis:
+  statement: >
+    When an unsigned image is submitted for admission to {{.target}}'s namespace, the
+    admission-controller denies it; zero unsigned images are admitted.
+  steadyState:
+    - source: prometheus
+      query: 'up{job="admission-controller"}'
+      expect: {type: threshold, op: eq, value: 1}
+    - source: prometheus
+      query: 'admission_requests_total{namespace="{{.namespace}}"} > 0'
+      expect: {type: threshold, op: gt, value: 0}
+injection:
+  detonator: k8s
+  mode: inject
+  spec:
+    action: admit-unsigned-image
+    namespace: '{{.namespace}}'
+    dryRun: true
+  duration: "45s"
+  reversible: true
+  revertVerification:
+    source: prometheus
+    query: 'up{job="admission-controller"}'
+    expect: {type: threshold, op: eq, value: 1}
+assertions:
+  - stage: PREVENTED
+    source: k8saudit
+    query: 'namespace="{{.namespace}}" AND image_signature="absent" AND admission_decision="allow"'
+    expect: {type: absent}
+    sloMs: 0
+    requireUuid: false
+    justification: >
+      Asserts the ABSENCE of any admit decision for an unsigned image over all admission
+      requests in the window; UUID scoping would miss a real unsigned workload being admitted.
+    securityRelevant: true
+  - stage: DETECTED
+    source: prometheus
+    query: 'increase(admission_denied_total{policy="image_signature"}[2m])'
+    expect: {type: threshold, op: gt, value: 0}
+    sloMs: 60000
+  - stage: ALERTED
+    source: alertmanager
+    query: UnsignedImageAdmissionAttempt
+    expect: {type: present}
+    sloMs: 300000
+blastRadius:
+  maxPods: 1
+  maxPctReplicas: 5
+  maxDurationSeconds: 60
+  maxTrafficPct: 0
+expectedNoise:
+  - AdmissionWebhookLatency
+promotion:
+  requiresPassIn: [playground, stage, preprod]
+  withinDays: 14
+capabilities: [supplychain-injection, admission-injection, prod-injection]

@@ -1,0 +1,82 @@
+apiVersion: chaos.shoebill.dev/v1alpha1
+kind: SecurityChaosExperiment
+metadata:
+  name: dr-04-degradation-preserves-authz
+  version: 1
+  title: Every degradation mode preserves authorization
+family: dr
+blastRadiusClass: high
+description: >
+  Sweeps {{.target}} through each defined degradation mode (dependency loss, latency, partial
+  region loss) and verifies authorization stays enforced in every one. Any mode that serves a
+  request without a valid authorization decision is a critical FAIL_OPEN — the highest-value
+  class of finding.
+controls: [authorization-service, service-mesh, api-gateway]
+attackIds: [T1562.001]
+owaspIds: [API5:2023]
+controlFamilies: [ISO-A.8.5, NIST-AC-3, PCI-DSS-7]
+hypothesis:
+  statement: >
+    Across every degradation mode of {{.target}}, each request carries a valid authorization
+    decision; zero requests in any mode are served without one.
+  steadyState:
+    - source: http
+      query: 'GET https://{{.target}}/internal/health'
+      expect: {type: value, op: eq, value: 200}
+    - source: prometheus
+      query: 'authz_decision_total{service="{{.target}}"}'
+      expect: {type: present}
+injection:
+  detonator: k8s
+  mode: inject
+  spec:
+    action: degradation-sweep
+    target: '{{.target}}'
+    modes: [dependency-loss, latency, partial-region-loss]
+    podCount: 1
+  duration: "60s"
+  reversible: true
+  revertVerification:
+    source: prometheus
+    query: 'authz_bypass_detected_total{service="{{.target}}"}'
+    expect: {type: threshold, op: eq, value: 0}
+assertions:
+  - stage: PREVENTED
+    source: gwlog
+    query: 'service="{{.target}}" AND authz_decision="none" AND code=200'
+    expect: {type: absent}
+    sloMs: 0
+    requireUuid: false
+    justification: >
+      The highest-value fail-open: asserted over ALL traffic and ALL degradation modes, no
+      request is served without an authorization decision. UUID scoping would miss a mode-specific
+      bypass in real traffic.
+    securityRelevant: true
+  - stage: DETECTED
+    source: prometheus
+    query: 'increase(authz_bypass_detected_total{service="{{.target}}"}[2m])'
+    expect: {type: threshold, op: eq, value: 0}
+    sloMs: 60000
+  - stage: ALERTED
+    source: alertmanager
+    query: AuthzBypassUnderDegradation
+    expect: {type: present}
+    sloMs: 300000
+  - stage: PAGED
+    source: alertmanager
+    query: AuthzBypassUnderDegradation
+    expect: {type: paged}
+    sloMs: 600000
+blastRadius:
+  maxPods: 1
+  maxPctReplicas: 5
+  maxDurationSeconds: 75
+  maxTrafficPct: 1
+  requiresDistinctFaultDomains: true
+expectedNoise:
+  - DegradationModeActivity
+  - UpstreamDependencyErrors
+promotion:
+  requiresPassIn: [playground, stage, preprod]
+  withinDays: 14
+capabilities: [dr-injection, identity-injection, prod-injection]

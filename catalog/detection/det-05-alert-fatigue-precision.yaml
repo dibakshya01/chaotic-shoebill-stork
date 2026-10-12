@@ -1,0 +1,53 @@
+apiVersion: chaos.shoebill.dev/v1alpha1
+kind: SecurityChaosExperiment
+metadata:
+  name: det-05-alert-fatigue-precision
+  version: 1
+  title: Alert-fatigue and precision measurement
+family: detection
+blastRadiusClass: low
+description: >
+  A read-only measurement that the Tier-1 alert false-positive ratio for {{.target}} stays
+  below the agreed ceiling over the window. Low precision drives alert fatigue, which erodes
+  response to real incidents. observe_only — safe to run at any time.
+controls: [detection-rule, siem, alerting-pipeline]
+attackIds: [T1562.001]
+owaspIds: [A09:2025]
+controlFamilies: [ISO-A.8.16, NIST-SI-4, SOC2-CC7.2]
+hypothesis:
+  statement: >
+    Over the measurement window, the Tier-1 alert false-positive ratio for {{.target}} stays at
+    or below the agreed ceiling; precision does not degrade into alert fatigue.
+  steadyState:
+    - source: prometheus
+      query: 'alert_precision_ratio{tier="1",service="{{.target}}"}'
+      expect: {type: threshold, op: gte, value: 0}
+injection:
+  detonator: observe
+  mode: observe_only
+  spec:
+    action: precision-measure
+assertions:
+  - stage: PREVENTED
+    source: prometheus
+    query: 'alert_false_positive_ratio{tier="1",service="{{.target}}"} > 0.2'
+    expect: {type: absent}
+    sloMs: 0
+    requireUuid: false
+    justification: >
+      A precision assertion over all Tier-1 alerts in the window; there is no injected run to
+      correlate a UUID against (observe_only).
+    securityRelevant: true
+  - stage: DETECTED
+    source: prometheus
+    query: 'alert_precision_last_measured_hours{tier="1",service="{{.target}}"}'
+    expect: {type: threshold, op: lt, value: 24}
+    sloMs: 60000
+blastRadius:
+  maxPods: 0
+  maxPctReplicas: 0
+  maxDurationSeconds: 0
+  maxTrafficPct: 0
+promotion:
+  requiresPassIn: []
+  withinDays: 14

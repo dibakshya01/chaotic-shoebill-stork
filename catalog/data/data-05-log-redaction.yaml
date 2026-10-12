@@ -1,0 +1,72 @@
+apiVersion: chaos.shoebill.dev/v1alpha1
+kind: SecurityChaosExperiment
+metadata:
+  name: data-05-log-redaction
+  version: 1
+  title: Log redaction of secrets and PII
+family: data
+blastRadiusClass: medium
+description: >
+  Drives {{.target}} through code paths that would log secrets or PII and verifies the
+  redaction filter scrubs them before persistence. A persisted log line containing an
+  unredacted secret or PII value is a FAIL_OPEN of log hygiene.
+controls: [log-pipeline, redaction-filter, data-pipeline]
+attackIds: [T1552.001, T1530]
+owaspIds: [API3:2023]
+controlFamilies: [DPDP-S.8, PCI-DSS-3.4, ISO-A.8.12, NIST-AU-9]
+hypothesis:
+  statement: >
+    When {{.target}} emits log lines containing secrets or PII, the redaction filter scrubs
+    them before persistence; zero persisted log lines contain an unredacted secret or PII.
+  steadyState:
+    - source: prometheus
+      query: 'up{job="log-pipeline",service="{{.target}}"}'
+      expect: {type: threshold, op: eq, value: 1}
+    - source: prometheus
+      query: 'log_redaction_applied_total{service="{{.target}}"}'
+      expect: {type: present}
+injection:
+  detonator: http
+  mode: inject
+  spec:
+    action: emit-sensitive-log
+    target: '{{.target}}'
+  duration: "45s"
+  reversible: true
+  revertVerification:
+    source: prometheus
+    query: 'up{job="log-pipeline",service="{{.target}}"}'
+    expect: {type: threshold, op: eq, value: 1}
+assertions:
+  - stage: PREVENTED
+    source: applog
+    query: 'service="{{.target}}" AND persisted=true AND unredacted_sensitive=true'
+    expect: {type: absent}
+    sloMs: 0
+    requireUuid: false
+    justification: >
+      Fail-open asserted over ALL persisted log lines in the window: none contains an
+      unredacted secret or PII value. UUID scoping would miss real leakage into logs.
+    securityRelevant: true
+  - stage: DETECTED
+    source: prometheus
+    query: 'increase(log_redaction_applied_total{service="{{.target}}"}[2m])'
+    expect: {type: threshold, op: gt, value: 0}
+    sloMs: 60000
+  - stage: ALERTED
+    source: alertmanager
+    query: UnredactedSensitiveLog
+    expect: {type: present}
+    sloMs: 300000
+blastRadius:
+  maxPods: 1
+  maxPctReplicas: 5
+  maxDurationSeconds: 60
+  maxTrafficPct: 1
+  requiresDistinctFaultDomains: true
+expectedNoise:
+  - LogPipelineThroughput
+promotion:
+  requiresPassIn: [playground, stage, preprod]
+  withinDays: 14
+capabilities: [data-injection, prod-injection]

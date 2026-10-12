@@ -1,0 +1,73 @@
+apiVersion: chaos.shoebill.dev/v1alpha1
+kind: SecurityChaosExperiment
+metadata:
+  name: id-02-revocation-ttl-honoured
+  version: 1
+  title: Token revocation TTL honoured
+family: identity
+blastRadiusClass: medium
+description: >
+  Revokes a canary token and replays it against {{.target}} past the revocation propagation
+  TTL, verifying it is no longer accepted. A revoked credential served after its TTL is a
+  stale-authorization failure.
+controls: [authorization-service, token-service, session-service]
+attackIds: [T1078]
+owaspIds: [API2:2023]
+controlFamilies: [ISO-A.8.5, NIST-AC-12, SOC2-CC6.2]
+hypothesis:
+  statement: >
+    When a token is revoked, requests bearing it against {{.target}} are denied once the
+    revocation TTL elapses; zero revoked-token requests are served after the TTL.
+  steadyState:
+    - source: http
+      query: 'GET https://{{.target}}/internal/health'
+      expect: {type: value, op: eq, value: 200}
+    - source: prometheus
+      query: 'token_revocation_enforced_total{service="{{.target}}"}'
+      expect: {type: present}
+injection:
+  detonator: http
+  mode: inject
+  spec:
+    action: revoke-then-replay
+    target: '{{.target}}'
+    ttlGraceSeconds: 10
+  duration: "60s"
+  reversible: true
+  revertVerification:
+    source: prometheus
+    query: 'up{job="token-service"}'
+    expect: {type: threshold, op: eq, value: 1}
+assertions:
+  - stage: PREVENTED
+    source: gwlog
+    query: 'service="{{.target}}" AND token_state="revoked" AND past_ttl=true AND code=200'
+    expect: {type: absent}
+    sloMs: 0
+    requireUuid: false
+    justification: >
+      Asserts the ABSENCE of any revoked-token request served past its TTL over all traffic in
+      the window; UUID scoping would miss a real stale-authorization leak.
+    securityRelevant: true
+  - stage: DETECTED
+    source: prometheus
+    query: 'increase(token_revocation_enforced_total{service="{{.target}}"}[2m])'
+    expect: {type: threshold, op: gt, value: 0}
+    sloMs: 60000
+  - stage: ALERTED
+    source: alertmanager
+    query: RevokedTokenUsage
+    expect: {type: present}
+    sloMs: 300000
+blastRadius:
+  maxPods: 1
+  maxPctReplicas: 5
+  maxDurationSeconds: 75
+  maxTrafficPct: 1
+  requiresDistinctFaultDomains: true
+expectedNoise:
+  - TokenServiceErrorRate
+promotion:
+  requiresPassIn: [playground, stage, preprod]
+  withinDays: 14
+capabilities: [identity-injection, prod-injection]
