@@ -105,14 +105,15 @@ controls they signed off on still work — without causing an incident to find o
   6. otherwise (≥1 asserted stage did not match at all) → **FAIL_UNDETECTED**.
   A stage that was *not asserted* is absent from the ladder and ignored. A stage *asserted but
   unobserved because its source errored* is `INCONCLUSIVE` (rule 3). A stage *skipped because an
-  earlier required stage failed* is `SKIP` and counts as "did not match" for rule 6.
+  earlier asserted stage failed* is `SKIP` and counts as "did not match" for rule 6.
   *Proof:* a table-driven test enumerating every rule, incl. FAIL_OPEN dominance over a stage that
   otherwise PASSed, and INCONCLUSIVE never becoming PASS.
 - **FR-10** Assertions correlate on the run UUID by default; `requireUuid:false` requires a written
   `justification` (schema-enforced). *Proof:* catalog validation test.
-- **FR-11** Control Efficacy Score = raw(weighted ladder, weights in §3a) × freshness(exp decay,
-  τ=14 Tier-1/30 else); untested expected control = 0.0; an open Tier-1 FAIL_OPEN caps the service
-  score at 0.4. *Proof:* scoring tests covering decay, cap, and untested=0.
+- **FR-11** Control Efficacy Score = raw(weighted ladder, weights in §3a) × freshness, where
+  `freshness = e^(−days_since_last_run / τ)`, τ=14 for Tier-1 and 30 for Tier-2/3; untested expected
+  control = 0.0; an open Tier-1 FAIL_OPEN caps the service score at 0.4. *Proof:* scoring tests
+  covering decay, cap, and untested=0.
 - **FR-11a** A fail-open *observation* is never swallowed by a later abort: if any stage recorded a
   matched security-relevant `absent` assertion, a FAIL_OPEN finding is opened even when the run
   verdict is ABORTED. *Proof:* test aborts a run after a fail-open observation and asserts the

@@ -29,7 +29,11 @@ was done, what was verified, and anything deferred.
     man's-switch FR/test · B6 API/UI contract fixed (endpoints, polling, localhost-only exec).
   - Non-blocking folded in: record FAIL_OPEN even when ABORTED; promotion N=14 default; demo uses an
     ephemeral key; charter-enforcement wording made precise; finding.md ATT&CK version reconciled.
-- Cycle 2 review spawned.
+- **Cycle 2 → REVISE** (all 6 original blockers resolved; one new: N1, undefined "Tier-1"). Fixed:
+  defined service `tier` ∈ {1,2,3} enum, wired into FR-11 decay/cap and FR-15 validation; plus the
+  expected-control-set source, key unification, and FR-9/DoD wording.
+- **Cycle 3 → APPROVE.** Spec approved in 3 cycles. Two cosmetic residuals fixed (pinned the decay
+  base e^(−age/τ); rule-6 "required"→"asserted"). Phase 2 complete.
 
 ## Phase 3 — Build
 ### M1 — Domain model + evidence  ✅ (tests green)
