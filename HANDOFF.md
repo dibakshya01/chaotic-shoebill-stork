@@ -1,71 +1,47 @@
-# Handoff — what only you can do
+# Handoff
 
-The platform is built, tested, documented, and (if push succeeded) pushed. This is the short,
-numbered list of the remaining steps that require **your** GitHub account, credentials, or a human
-decision. Each has the exact command or click.
+The project is **built, hardened, pushed, released, and live**. This file records what was done for
+you and the few remaining steps that need your account/decisions.
 
 > Local toolchain note: this repo was bootstrapped with Go installed at `~/.local/go-sdk` (it was not
-> on the system before). On your machine, use your own Go 1.24+ — nothing depends on that path.
+> on the system before) and a `goreleaser` at `~/go/bin`. On your own machine, use your own Go 1.24+.
 
-## 1. (If not already pushed) push the repo
-```bash
-cd "chaotic-shoebill-stork"
-git remote add origin https://github.com/dibakshya01/chaotic-shoebill-stork.git   # if no remote
-git push -u origin main
-```
-The confidential source doc (`chaotic-shoebill-stork.md`) is git-ignored and was never committed —
-keep it that way.
+## ✅ Already done
 
-## 2. Enable GitHub Pages for the landing site
-Settings → Pages → **Build and deployment: Deploy from a branch** → Branch **main** → **/docs** →
-Save. The site is in `/docs` with a `.nojekyll` file, so it serves as-is. It will be live at
-`https://dibakshya01.github.io/chaotic-shoebill-stork/`.
+1. **Code** — full control plane (Safety Governor, verification engine, Ed25519 evidence ledger,
+   efficacy score, engine, dead-man's switch), CLI, offline demo, REST API + embedded dashboard,
+   60-experiment catalog, Kubernetes CRDs + controller skeleton. `go test ./... -race` green.
+2. **Pushed** — github.com/dibakshya01/chaotic-shoebill-stork, branch `main` (confidential source doc
+   never committed; zero internal names in the tree — audited).
+3. **CI green** — the CI workflow passed on `main` (gofmt, vet, `go test -race`, coverage, catalog
+   validate, demo + evidence verify).
+4. **Landing site LIVE** → https://dibakshya01.github.io/chaotic-shoebill-stork/ (GitHub Pages,
+   `/docs`). Animated, responsive, reduced-motion-safe, with the Security Chaos Engineering explainer.
+5. **Release v0.1.0 published** — cross-platform binaries (linux/darwin/windows × amd64/arm64) +
+   checksums: https://github.com/dibakshya01/chaotic-shoebill-stork/releases/tag/v0.1.0
+6. **Container image** building/pushed to `ghcr.io/dibakshya01/shoebill:v0.1.0` (multi-arch, cosign
+   keyless-signed by the release workflow).
+7. **Hardened** — 3 back-to-back adversarial review rounds; all findings fixed (see `BUILD_LOG.md`).
 
-## 3. Cut the first release
-```bash
-git tag -a v0.1.0 -m "chaotic-shoebill-stork v0.1.0 — MVP"
-git push origin v0.1.0
-gh release create v0.1.0 --title "v0.1.0 — MVP" --notes-file CHANGELOG.md
-```
-(Publishing a release is outward-facing — it's yours to run.)
+## ⏭ What only you can do
 
-## 4. Distribution — pick your channels (GitHub Marketplace does NOT apply)
-GitHub Marketplace lists only **GitHub Actions and Apps**; this is a CLI/platform, so it is not
-eligible. The correct distribution paths:
-- **`go install`** already works:
-  `go install github.com/dibakshya01/chaotic-shoebill-stork/cmd/shoebill@latest`
-- **Container image** (GHCR): add a `Dockerfile` + a release workflow, or build locally and
-  `docker push ghcr.io/dibakshya01/shoebill:v0.1.0`.
-- **Homebrew tap**: create `dibakshya01/homebrew-tap` with a `shoebill.rb` formula (use GoReleaser to
-  generate it).
-- **Krew** (for the operator as a kubectl plugin) — later, once the operator is built.
-- Consider **GoReleaser** to automate binaries + checksums + Homebrew + container on each tag.
+1. **Make the GHCR container image public** (it defaults to private): GitHub → your profile →
+   Packages → `shoebill` → Package settings → Change visibility → Public. Then
+   `docker pull ghcr.io/dibakshya01/shoebill:v0.1.0` works for everyone.
+2. **Repo polish**: add a description + topics (`security-chaos-engineering`, `chaos-engineering`,
+   `security`, `appsec`, `kubernetes`, `go`), enable Issues + Discussions, and turn on
+   **Security → Report a vulnerability** (SECURITY.md points to it).
+3. **Branch protection** on `main`: require the CI check + 1 review (CODEOWNERS already gates the
+   safety-critical packages).
+4. **Homebrew tap** (optional): create `dibakshya01/homebrew-tap` + a PAT, uncomment the `brews:`
+   block in `.goreleaser.yaml`, and the next release publishes a formula. `go install` already works:
+   `go install github.com/dibakshya01/chaotic-shoebill-stork/cmd/shoebill@latest`.
+5. **Launch** (your accounts, your voice): draft copy is in `LAUNCH.md` (git-ignored, never
+   committed) — a Show HN, a Reddit r/netsec / r/kubernetes post, and a short social post.
+6. **GitHub Marketplace does NOT apply** — it lists only Actions/Apps; this is a CLI/platform.
+   Distribution is `go install` + GHCR container + Homebrew + K8s.
 
-## 5. Repo hygiene (your auth)
-- Add branch protection on `main` (require CI + 1 review; CODEOWNERS already gates the safety-critical
-  packages).
-- Enable Issues + Discussions; add topics: `security-chaos-engineering`, `chaos-engineering`,
-  `security`, `kubernetes`, `go`, `appsec`.
-- Turn on the **Security → Report a vulnerability** advisory flow (SECURITY.md points to it).
+## Next engineering milestone (see `ROADMAP.md`)
 
-## 6. Launch (your accounts, your voice)
-Draft copy is in `LAUNCH.md` (git-ignored — never committed). It has a Hacker News "Show HN", a
-Reddit r/netsec / r/kubernetes post, and a short social post. Post from your accounts when ready.
-
-## 7. Optional next steps
-- Record a short demo GIF of `shoebill serve --demo` for the README/site (e.g. with `vhs` or a
-  screen recorder) — the three screenshots are already embedded as a stand-in.
-- Build the operator in a cluster-dev environment (`operator/README.md`) and run it against a kind
-  cluster with real detonators.
-- Set up an external evidence witness / transparency log if you want non-repudiation beyond the
-  single-key model (documented as out of scope for v1 in `docs/can-and-cannot.md`).
-
----
-
-### What was done for you
-- Full control plane (Safety Governor, verification engine, scoring, Ed25519 evidence ledger), CLI,
-  offline demo, REST API, embedded dashboard, 60-experiment catalog, Kubernetes CRDs + controller
-  skeleton. All unit-tested offline; `go test ./... -race` green; `shoebill demo` + `evidence verify`
-  reproduce the README's claims.
-- Research (`finding.md`), spec reviewed to APPROVE over 3 cycles (`build-plan.md`), docs, a landing
-  site, CI, and ≥3 adversarial hardening rounds (see `BUILD_LOG.md`).
+Complete the Kubernetes operator (real client-go detonators + the autonomous agent), then cloud
+attack coverage via Stratus Red Team, then an external evidence witness/transparency log.
