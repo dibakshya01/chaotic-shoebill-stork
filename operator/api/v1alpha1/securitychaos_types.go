@@ -30,11 +30,11 @@ type Hypothesis struct {
 type Injection struct {
 	Detonator string `json:"detonator"`
 	// +kubebuilder:validation:Enum=inject;observe_only
-	Mode               string                `json:"mode"`
-	Spec               *runtimeRawExtension  `json:"spec,omitempty"`
-	Duration           string                `json:"duration,omitempty"`
-	Reversible         bool                  `json:"reversible,omitempty"`
-	RevertVerification *Probe                `json:"revertVerification,omitempty"`
+	Mode               string               `json:"mode"`
+	Spec               *runtimeRawExtension `json:"spec,omitempty"`
+	Duration           string               `json:"duration,omitempty"`
+	Reversible         bool                 `json:"reversible,omitempty"`
+	RevertVerification *Probe               `json:"revertVerification,omitempty"`
 }
 
 // Assertion is one ladder rung checked after detonation.
@@ -110,7 +110,7 @@ type SecurityChaosExperimentList struct {
 
 // ServiceRef identifies the target service.
 type ServiceRef struct {
-	ID string `json:"id,omitempty"`
+	ID   string `json:"id,omitempty"`
 	Name string `json:"name,omitempty"`
 	// +kubebuilder:validation:Enum=1;2;3
 	Tier           int    `json:"tier,omitempty"`

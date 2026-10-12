@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: build · vet · test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+
+      - name: gofmt
+        run: |
+          unformatted=$(gofmt -l $(git ls-files '*.go'))
+          if [ -n "$unformatted" ]; then
+            echo "These files are not gofmt-ed:"; echo "$unformatted"; exit 1
+          fi
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: build
+        run: go build ./...
+
+      - name: test
+        run: go test ./... -race -count=1
+
+      - name: coverage (safety-critical packages)
+        run: |
+          go test ./internal/safety/... ./internal/verify/... ./internal/score/... ./internal/evidence/... \
+            -coverprofile=coverage.out
+          go tool cover -func=coverage.out | tail -1
+
+      - name: catalog validate
+        run: |
+          go build -o bin/shoebill ./cmd/shoebill
+          ./bin/shoebill catalog validate ./catalog
+
+      - name: demo smoke + evidence verify
+        run: |
+          ./bin/shoebill demo --dir .shoebill
+          ./bin/shoebill evidence verify --dir .shoebill/evidence --key .shoebill/evidence.key.pub
