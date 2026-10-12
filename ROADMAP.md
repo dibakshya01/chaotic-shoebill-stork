@@ -49,6 +49,8 @@ The control plane already runs on any cloud. Deep cloud *attack* coverage is add
       compromised signing key (today's ledger is tamper/reorder/truncation-evident but single-key).
 - [ ] Optional OPA/Rego policy engine behind the native blast-radius policy.
 - [ ] Game Day authoring/launch from the UI (read-only in v1).
-- [ ] Scheduler + Flow/CI gate integration; a ServiceHub-style posture card.
+- [x] Recurring runs: a `SecurityChaosRun` with a cron `spec.schedule` is scheduled by the operator
+      (wait → execute → reschedule), with full history in the signed ledger (unit-tested).
+- [ ] CI-gate integration and a service-catalog posture card.
 
 Contributions welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).

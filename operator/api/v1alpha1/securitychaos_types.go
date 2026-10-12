@@ -168,6 +168,11 @@ type SecurityChaosRunStatus struct {
 	FindingID string   `json:"findingId,omitempty"`
 	ReceiptID string   `json:"receiptId,omitempty"`
 	Refusals  []string `json:"refusals,omitempty"`
+	// Scheduling (when spec.schedule is a cron expression): the last execution time and
+	// the next one. Each execution appends a signed receipt to the ledger (full history
+	// lives there); the status reflects the latest run.
+	LastRunTime *metav1.Time `json:"lastRunTime,omitempty"`
+	NextRunTime *metav1.Time `json:"nextRunTime,omitempty"`
 }
 
 // +kubebuilder:object:root=true

@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"testing"
+	"time"
 
 	v1 "github.com/dibakshya01/chaotic-shoebill-stork/operator/api/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -89,6 +90,71 @@ func TestReconcileRefusedDoesNotExecute(t *testing.T) {
 	}
 	if got.Status.Verdict != "" {
 		t.Fatalf("a refused run has no verdict, got %q", got.Status.Verdict)
+	}
+}
+
+func TestNextRun(t *testing.T) {
+	base := time.Date(2026, 1, 1, 2, 0, 0, 0, time.UTC)
+	n, err := nextRun("17 3 * * *", base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n.Hour() != 3 || n.Minute() != 17 {
+		t.Fatalf("next run should be 03:17, got %v", n)
+	}
+	if _, err := nextRun("not a cron", base); err == nil {
+		t.Fatal("an invalid cron must error")
+	}
+}
+
+func TestReconcileScheduledWaitsThenRuns(t *testing.T) {
+	s := newScheme(t)
+	run := runCR()
+	run.Spec.Schedule = "*/5 * * * *" // every 5 minutes
+	cl := fake.NewClientBuilder().WithScheme(s).WithStatusSubresource(&v1.SecurityChaosRun{}).
+		WithRuntimeObjects(expCR(), run).Build()
+	r := &SecurityChaosRunReconciler{Client: cl, Scheme: s,
+		ControlPlane: stubControlPlane{allowed: true, status: v1.SecurityChaosRunStatus{Phase: "Completed", Verdict: "PASS", RunID: "r-1"}}}
+	req := ctrl.Request{NamespacedName: types.NamespacedName{Name: "run-1", Namespace: "ns"}}
+	ctx := context.Background()
+
+	// First reconcile: it SCHEDULES the next run and waits — it does not execute.
+	res, err := r.Reconcile(ctx, req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.RequeueAfter <= 0 {
+		t.Fatal("a scheduled run should requeue for its next fire time")
+	}
+	var got v1.SecurityChaosRun
+	_ = cl.Get(ctx, req.NamespacedName, &got)
+	if got.Status.Phase != "Scheduled" || got.Status.NextRunTime == nil {
+		t.Fatalf("expected Scheduled with a next run time, got %+v", got.Status)
+	}
+	if got.Status.Verdict != "" {
+		t.Fatal("a scheduled run must not execute before its time")
+	}
+
+	// Force the next fire time into the past, reconcile again: now it runs + reschedules.
+	past := metav1.Time{Time: time.Now().Add(-time.Minute)}
+	got.Status.NextRunTime = &past
+	if err := cl.Status().Update(ctx, &got); err != nil {
+		t.Fatal(err)
+	}
+	res2, err := r.Reconcile(ctx, req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var done v1.SecurityChaosRun
+	_ = cl.Get(ctx, req.NamespacedName, &done)
+	if done.Status.Phase != "Completed" || done.Status.Verdict != "PASS" {
+		t.Fatalf("scheduled run should have executed, got %+v", done.Status)
+	}
+	if done.Status.LastRunTime == nil {
+		t.Fatal("a completed scheduled run should record its last run time")
+	}
+	if res2.RequeueAfter <= 0 {
+		t.Fatal("after a scheduled run it should requeue for the next one")
 	}
 }
 

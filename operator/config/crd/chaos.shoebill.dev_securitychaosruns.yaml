@@ -145,6 +145,16 @@ spec:
             properties:
               findingId:
                 type: string
+              lastRunTime:
+                description: |-
+                  Scheduling (when spec.schedule is a cron expression): the last execution time and
+                  the next one. Each execution appends a signed receipt to the ledger (full history
+                  lives there); the status reflects the latest run.
+                format: date-time
+                type: string
+              nextRunTime:
+                format: date-time
+                type: string
               phase:
                 type: string
               receiptId:

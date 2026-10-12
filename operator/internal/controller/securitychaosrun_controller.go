@@ -1,13 +1,16 @@
-// Package controller holds the reconciler skeletons. The SecurityChaosRun reconciler
-// is the ONLY door to injection on-cluster: it delegates authorization to the control
-// plane's Safety Governor and never detonates on its own. This file is scaffolding —
-// see operator/README.md for how to generate deepcopy, build, and run it.
+// Package controller holds the SecurityChaosRun reconciler: the ONLY door to injection
+// on-cluster. It delegates authorization to the control plane's Safety Governor and
+// never detonates on its own. It also schedules recurring runs when spec.schedule is a
+// cron expression. See operator/README.md to generate deepcopy, build, and run it.
 package controller
 
 import (
 	"context"
+	"time"
 
 	v1alpha1 "github.com/dibakshya01/chaotic-shoebill-stork/operator/api/v1alpha1"
+	"github.com/robfig/cron/v3"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -46,8 +49,35 @@ func (r *SecurityChaosRunReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	if err := r.Get(ctx, req.NamespacedName, &run); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
-	if run.Status.Phase == "Completed" || run.Status.Phase == "Refused" {
-		return ctrl.Result{}, nil // terminal
+	scheduled := run.Spec.Schedule != ""
+	now := time.Now()
+
+	// One-shot runs are terminal once done.
+	if !scheduled && (run.Status.Phase == "Completed" || run.Status.Phase == "Refused") {
+		return ctrl.Result{}, nil
+	}
+
+	// Scheduled runs: on first sight, compute the next fire time and wait for it; while
+	// it is in the future, keep waiting rather than running.
+	if scheduled {
+		if run.Status.NextRunTime == nil {
+			next, err := nextRun(run.Spec.Schedule, now)
+			if err != nil {
+				run.Status.Phase = "Refused"
+				run.Status.Refusals = []string{"invalid schedule: " + err.Error()}
+				return ctrl.Result{}, r.Status().Update(ctx, &run)
+			}
+			run.Status.Phase = "Scheduled"
+			run.Status.NextRunTime = &metav1.Time{Time: next}
+			if err := r.Status().Update(ctx, &run); err != nil {
+				return ctrl.Result{}, err
+			}
+			return ctrl.Result{RequeueAfter: time.Until(next)}, nil
+		}
+		if wait := run.Status.NextRunTime.Time.Sub(now); wait > 0 {
+			return ctrl.Result{RequeueAfter: wait}, nil
+		}
+		// else: it is time to run — fall through to gate + execute.
 	}
 
 	// Resolve the referenced experiment definition.
@@ -69,7 +99,7 @@ func (r *SecurityChaosRunReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		run.Status.Phase = "Refused"
 		run.Status.Refusals = refusals
 		l.Info("run refused by safety governor", "run", run.Name, "refusals", len(refusals))
-		return ctrl.Result{}, r.Status().Update(ctx, &run)
+		return r.finish(ctx, &run, scheduled, now)
 	}
 
 	// EXECUTE: the control plane runs the full loop and returns the signed verdict.
@@ -79,7 +109,35 @@ func (r *SecurityChaosRunReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 	run.Status = status
 	run.Status.Phase = "Completed"
-	return ctrl.Result{}, r.Status().Update(ctx, &run)
+	return r.finish(ctx, &run, scheduled, now)
+}
+
+// finish persists the status and, for scheduled runs, records this run's time and
+// schedules the next one (requeuing accordingly). The full run history lives in the
+// signed evidence ledger; the status reflects the latest run.
+func (r *SecurityChaosRunReconciler) finish(ctx context.Context, run *v1alpha1.SecurityChaosRun, scheduled bool, now time.Time) (ctrl.Result, error) {
+	if !scheduled {
+		return ctrl.Result{}, r.Status().Update(ctx, run)
+	}
+	run.Status.LastRunTime = &metav1.Time{Time: now}
+	next, err := nextRun(run.Spec.Schedule, now)
+	if err != nil {
+		return ctrl.Result{}, r.Status().Update(ctx, run)
+	}
+	run.Status.NextRunTime = &metav1.Time{Time: next}
+	if uerr := r.Status().Update(ctx, run); uerr != nil {
+		return ctrl.Result{}, uerr
+	}
+	return ctrl.Result{RequeueAfter: time.Until(next)}, nil
+}
+
+// nextRun computes the next fire time of a standard 5-field cron expression after t.
+func nextRun(schedule string, t time.Time) (time.Time, error) {
+	sched, err := cron.ParseStandard(schedule)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return sched.Next(t), nil
 }
 
 // SetupWithManager wires the reconciler to the manager.

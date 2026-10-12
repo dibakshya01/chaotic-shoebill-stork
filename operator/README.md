@@ -41,6 +41,13 @@ Dockerfile             builds the manager image (from the repo root)
 The controller never injects directly; the capability each detonator acts on is signed
 by the Governor, not the operator.
 
+### Recurring runs
+
+Set `spec.schedule` on a `SecurityChaosRun` to a standard 5-field cron expression and the
+operator schedules it (wait for the next fire time → gate → execute → reschedule). Each
+execution appends a signed receipt to the ledger (full history there); the status shows
+the latest run plus `lastRunTime` / `nextRunTime`.
+
 ## The `netpol` detonator
 
 A real, bounded, reversible action: it applies a **deny-all-ingress NetworkPolicy** to
