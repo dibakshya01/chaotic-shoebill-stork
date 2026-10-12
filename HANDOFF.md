@@ -23,16 +23,20 @@ you and the few remaining steps that need your account/decisions.
    keyless-signed by the release workflow).
 7. **Hardened** — 3 back-to-back adversarial review rounds; all findings fixed (see `BUILD_LOG.md`).
 
-## ⏭ What only you can do
+## ✅ Also done (steps 1–3)
 
-1. **Make the GHCR container image public** (it defaults to private): GitHub → your profile →
-   Packages → `shoebill` → Package settings → Change visibility → Public. Then
-   `docker pull ghcr.io/dibakshya01/shoebill:v0.1.0` works for everyone.
-2. **Repo polish**: add a description + topics (`security-chaos-engineering`, `chaos-engineering`,
-   `security`, `appsec`, `kubernetes`, `go`), enable Issues + Discussions, and turn on
-   **Security → Report a vulnerability** (SECURITY.md points to it).
-3. **Branch protection** on `main`: require the CI check + 1 review (CODEOWNERS already gates the
-   safety-critical packages).
+1. **GHCR container image is PUBLIC** — it inherited public visibility from the public repo
+   (confirmed: "This package is currently public"). `docker pull ghcr.io/dibakshya01/shoebill:v0.1.0`
+   works for everyone.
+2. **Repo polished** — description + homepage set; 9 topics (security-chaos-engineering,
+   chaos-engineering, security, appsec, kubernetes, golang, devsecops, security-tools, sre); Issues +
+   Discussions enabled; **private vulnerability reporting enabled**.
+3. **Branch protection on `main`** — requires the `build · vet · test` CI check (strict/up-to-date),
+   blocks force-pushes and deletion, linear history; admins not enforced so you (solo maintainer)
+   aren't locked out. Add a required review once you have collaborators.
+
+## ⏭ What still needs you
+
 4. **Homebrew tap** (optional): create `dibakshya01/homebrew-tap` + a PAT, uncomment the `brews:`
    block in `.goreleaser.yaml`, and the next release publishes a formula. `go install` already works:
    `go install github.com/dibakshya01/chaotic-shoebill-stork/cmd/shoebill@latest`.
