@@ -62,10 +62,10 @@ type Target struct {
 // Scope is the requested blast radius for a run — checked against the experiment's
 // BlastRadius ceiling and the environment policy by the Safety Governor.
 type Scope struct {
-	PodCount      int `json:"pod_count" yaml:"podCount"`
-	PctOfReplicas int `json:"pct_of_replicas" yaml:"pctOfReplicas"`
-	DurationSec   int `json:"duration_seconds" yaml:"durationSeconds"`
-	PctTraffic    int `json:"pct_traffic" yaml:"pctTraffic"`
+	PodCount      int `json:"podCount" yaml:"podCount"`
+	PctOfReplicas int `json:"pctOfReplicas" yaml:"pctOfReplicas"`
+	DurationSec   int `json:"durationSeconds" yaml:"durationSeconds"`
+	PctTraffic    int `json:"pctTraffic" yaml:"pctTraffic"`
 }
 
 // Approval records one sign-off. Prod requires two, from distinct teams.

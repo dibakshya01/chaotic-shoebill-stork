@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>shoebill · Security Control Posture</title>
+  <meta name="description" content="Security Chaos Engineering — prove your security controls actually work." />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%233fd0c9' d='M12 2 4 6v6c0 5 3.4 8.5 8 10 4.6-1.5 8-5 8-10V6z'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M12 2 4 6v6c0 5 3.4 8.5 8 10 4.6-1.5 8-5 8-10V6z" fill="#05201e" stroke="#05201e"/><path d="M12 7v6m0 3.5v.01" stroke="#05201e" stroke-width="2" stroke-linecap="round"/></svg>
+      </div>
+      <div>
+        <h1>chaotic-shoebill-stork</h1>
+        <div class="sub">Security Chaos Engineering · prove your controls actually work</div>
+      </div>
+    </div>
+    <div class="spacer"></div>
+    <div class="ver" id="ver">—</div>
+  </header>
+
+  <nav class="tabs" id="tabs" role="tablist">
+    <button data-view="scorecard" class="active">Posture Scorecard</button>
+    <button data-view="failopen">Fail-Open Board</button>
+    <button data-view="runs">Run Console</button>
+    <button data-view="preview">Safety Preview</button>
+    <button data-view="experiments">Experiments</button>
+    <button data-view="gameday">Game Day</button>
+  </nav>
+
+  <main id="main">
+    <div class="spin">Loading…</div>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
