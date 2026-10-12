@@ -30,8 +30,9 @@ evidence/*.jsonl
 /web/node_modules/
 /web/dist/
 
-# Editor / OS
+# Editor / OS / local agent state
 .DS_Store
 .idea/
 .vscode/
+.claude/
 *.swp
