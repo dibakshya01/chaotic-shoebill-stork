@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="en" class="no-js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Architecture — chaotic-shoebill-stork</title>
+<meta name="description" content="The architecture of chaotic-shoebill-stork: the control plane (catalog, Safety Governor, verification engine, scoring, evidence vault), the agent and detonators, signal sources, the seven-step loop, and the Safety Governor's ten gates.">
+<meta name="theme-color" content="#0a0e14">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%233fd0c9'/%3E%3Cstop offset='1' stop-color='%231b6f6b'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect x='2' y='2' width='36' height='36' rx='10' fill='url(%23g)'/%3E%3Cpath d='M20 10.4 L26.9 12.9 V18.3 C26.9 22.6 24 25.9 20 27.6 C16 25.9 13.1 22.6 13.1 18.3 V12.9 Z' fill='%23ffffff' fill-opacity='.95'/%3E%3Cpath d='M16.7 19.1 L19 21.5 L23.6 15.9' fill='none' stroke='%23167a74' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="assets/css/site.css">
+<noscript><style>.reveal,.stagger>*{opacity:1!important;transform:none!important}</style></noscript>
+<script>document.documentElement.className = "js";</script>
+</head>
+<body>
+
+<header class="nav">
+  <div class="wrap nav__inner">
+    <a class="brand" href="index.html" aria-label="chaotic-shoebill-stork home">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><defs><linearGradient id="nb" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3fd0c9"/><stop offset="1" stop-color="#1b6f6b"/></linearGradient></defs><rect x="2" y="2" width="36" height="36" rx="10" fill="url(#nb)"/><rect x="2.5" y="2.5" width="35" height="35" rx="9.5" fill="none" stroke="#fff" stroke-opacity=".18"/><path d="M20 10.4 L26.9 12.9 V18.3 C26.9 22.6 24 25.9 20 27.6 C16 25.9 13.1 22.6 13.1 18.3 V12.9 Z" fill="#fff" fill-opacity=".95"/><path d="M16.7 19.1 L19 21.5 L23.6 15.9" fill="none" stroke="#167a74" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span><b>chaotic-shoebill-stork</b></span>
+    </a>
+    <button class="nav__toggle" aria-label="Toggle menu" aria-expanded="false" aria-controls="navlinks">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+    </button>
+    <nav class="nav__links" id="navlinks" aria-label="Primary">
+      <a href="index.html">Home</a>
+      <a href="index.html#how">How it works</a>
+      <a href="architecture.html" aria-current="page">Architecture</a>
+      <a href="eli5.html">ELI5</a>
+      <a href="contact.html">Contact</a>
+      <a class="btn btn--ghost btn--sm nav__cta" href="https://github.com/dibakshya01/chaotic-shoebill-stork">GitHub ↗</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+<!-- hero -->
+<section class="hero phero">
+  <div class="wrap">
+    <div class="reveal">
+      <span class="eyebrow">Architecture</span>
+      <h1>A control plane that <span class="accent">cannot lie</span>, and a data plane that cannot run loose.</h1>
+      <p class="hero__lead">Every injection flows through one choke point — the Safety Governor — and every result is signed into an append-only ledger. Here is how the pieces fit, the seven-step loop, and the ten gates in full.</p>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- diagram -->
+<section class="section">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="eyebrow">System overview</span>
+      <h2 class="section-title">Control plane, data plane, signals.</h2>
+      <p class="section-lead">The control plane decides and records. The data plane acts — but only on a signed decision. Signals come back from independent sources, and a correlation UUID threads the whole run together.</p>
+    </div>
+
+    <div class="diagram reveal">
+      <svg viewBox="0 0 860 572" role="img" aria-labelledby="archtitle archdesc">
+        <title id="archtitle">chaotic-shoebill-stork architecture</title>
+        <desc id="archdesc">The control plane contains the catalog, Safety Governor, verification engine, scoring and evidence vault. The Safety Governor's signed decision is the only path to the data plane, where the agent detonates a condition against the target and reverts it. Independent signal sources flow back up to the verification engine.</desc>
+        <defs>
+          <marker id="ah" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0L9 4.5L0 9z" fill="#3fd0c9"/></marker>
+          <marker id="ah2" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0L9 4.5L0 9z" fill="#6ea8fe"/></marker>
+          <marker id="ahd" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0L9 4.5L0 9z" fill="#d29922"/></marker>
+        </defs>
+
+        <!-- CONTROL PLANE -->
+        <rect x="18" y="20" width="824" height="176" rx="16" fill="#0e1420" stroke="#222c3d"/>
+        <text x="38" y="46" fill="#3fd0c9" font-family="ui-monospace,Menlo,monospace" font-size="13" letter-spacing="1.5">CONTROL PLANE</text>
+
+        <!-- chips -->
+        <g font-family="-apple-system,Segoe UI,Roboto,sans-serif">
+          <!-- Catalog -->
+          <rect x="40" y="70" width="148" height="104" rx="11" fill="#111722" stroke="#222c3d"/>
+          <text x="114" y="112" text-anchor="middle" fill="#e6edf3" font-size="16" font-weight="600">Catalog</text>
+          <text x="114" y="134" text-anchor="middle" fill="#9aa7b8" font-size="12.5">hypotheses</text>
+          <text x="114" y="151" text-anchor="middle" fill="#9aa7b8" font-size="12.5">as data</text>
+
+          <!-- Safety Governor (highlighted) -->
+          <rect x="202" y="70" width="156" height="104" rx="11" fill="#0f2422" stroke="#3fd0c9" stroke-width="1.6"/>
+          <text x="280" y="106" text-anchor="middle" fill="#6fe3dc" font-size="15.5" font-weight="700">Safety Governor</text>
+          <text x="280" y="128" text-anchor="middle" fill="#9aa7b8" font-size="12.5">10 gates</text>
+          <text x="280" y="145" text-anchor="middle" fill="#9aa7b8" font-size="12.5">the only door</text>
+
+          <!-- Verification Engine -->
+          <rect x="372" y="70" width="156" height="104" rx="11" fill="#111722" stroke="#222c3d"/>
+          <text x="450" y="106" text-anchor="middle" fill="#e6edf3" font-size="15.5" font-weight="600">Verification</text>
+          <text x="450" y="128" text-anchor="middle" fill="#9aa7b8" font-size="12.5">response ladder</text>
+          <text x="450" y="145" text-anchor="middle" fill="#9aa7b8" font-size="12.5">+ SLO</text>
+
+          <!-- Scoring -->
+          <rect x="542" y="70" width="140" height="104" rx="11" fill="#111722" stroke="#222c3d"/>
+          <text x="612" y="112" text-anchor="middle" fill="#e6edf3" font-size="15.5" font-weight="600">Scoring</text>
+          <text x="612" y="134" text-anchor="middle" fill="#9aa7b8" font-size="12.5">efficacy</text>
+          <text x="612" y="151" text-anchor="middle" fill="#9aa7b8" font-size="12.5">scorecard</text>
+
+          <!-- Evidence Vault -->
+          <rect x="696" y="70" width="128" height="104" rx="11" fill="#111722" stroke="#222c3d"/>
+          <text x="760" y="106" text-anchor="middle" fill="#e6edf3" font-size="14.5" font-weight="600">Evidence</text>
+          <text x="760" y="124" text-anchor="middle" fill="#e6edf3" font-size="14.5" font-weight="600">Vault</text>
+          <text x="760" y="146" text-anchor="middle" fill="#9aa7b8" font-size="12">Ed25519</text>
+          <text x="760" y="162" text-anchor="middle" fill="#9aa7b8" font-size="12">append-only</text>
+        </g>
+
+        <!-- intra-plane arrows -->
+        <line x1="188" y1="122" x2="200" y2="122" stroke="#3fd0c9" stroke-width="1.6" marker-end="url(#ah)"/>
+        <line x1="358" y1="122" x2="370" y2="122" stroke="#3fd0c9" stroke-width="1.6" marker-end="url(#ah)"/>
+        <line x1="528" y1="122" x2="540" y2="122" stroke="#3fd0c9" stroke-width="1.6" marker-end="url(#ah)"/>
+        <line x1="682" y1="122" x2="694" y2="122" stroke="#3fd0c9" stroke-width="1.6" marker-end="url(#ah)"/>
+
+        <!-- DECISION arrow down -->
+        <line x1="280" y1="196" x2="280" y2="246" stroke="#d29922" stroke-width="1.8" marker-end="url(#ahd)"/>
+        <text x="292" y="226" fill="#d29922" font-family="ui-monospace,Menlo,monospace" font-size="12">Decision{Allowed:true}</text>
+
+        <!-- DATA PLANE -->
+        <rect x="18" y="252" width="824" height="116" rx="16" fill="#140f0c" stroke="#2a2214"/>
+        <text x="38" y="278" fill="#d29922" font-family="ui-monospace,Menlo,monospace" font-size="13" letter-spacing="1.5">DATA PLANE</text>
+
+        <g font-family="-apple-system,Segoe UI,Roboto,sans-serif">
+          <rect x="60" y="290" width="300" height="62" rx="11" fill="#111722" stroke="#222c3d"/>
+          <text x="210" y="317" text-anchor="middle" fill="#e6edf3" font-size="15.5" font-weight="600">Agent · Detonators</text>
+          <text x="210" y="337" text-anchor="middle" fill="#9aa7b8" font-size="12.5">bounded · reversible · capability-scoped</text>
+
+          <rect x="500" y="290" width="300" height="62" rx="11" fill="#111722" stroke="#222c3d"/>
+          <text x="650" y="317" text-anchor="middle" fill="#e6edf3" font-size="15.5" font-weight="600">Target service + controls</text>
+          <text x="650" y="337" text-anchor="middle" fill="#9aa7b8" font-size="12.5">the system under test</text>
+        </g>
+
+        <!-- detonate / revert -->
+        <line x1="360" y1="310" x2="498" y2="310" stroke="#d29922" stroke-width="1.8" marker-end="url(#ahd)"/>
+        <text x="429" y="303" text-anchor="middle" fill="#d29922" font-family="ui-monospace,Menlo,monospace" font-size="11.5">DETONATE</text>
+        <line x1="500" y1="334" x2="362" y2="334" stroke="#3fb950" stroke-width="1.8" marker-end="url(#ah)"/>
+        <text x="431" y="349" text-anchor="middle" fill="#3fb950" font-family="ui-monospace,Menlo,monospace" font-size="11.5">REVERT ✓ verified</text>
+
+        <!-- signals down from target -->
+        <line x1="650" y1="352" x2="650" y2="420" stroke="#6ea8fe" stroke-width="1.6" marker-end="url(#ah2)"/>
+
+        <!-- SIGNAL SOURCES -->
+        <rect x="18" y="426" width="824" height="124" rx="16" fill="#0d1420" stroke="#1d2a3d"/>
+        <text x="38" y="452" fill="#6ea8fe" font-family="ui-monospace,Menlo,monospace" font-size="13" letter-spacing="1.5">SIGNAL SOURCES · independent</text>
+
+        <g font-family="-apple-system,Segoe UI,Roboto,sans-serif" font-size="13.5" fill="#e6edf3">
+          <rect x="44" y="470" width="180" height="58" rx="10" fill="#111722" stroke="#222c3d"/>
+          <text x="134" y="498" text-anchor="middle">Metrics</text><text x="134" y="516" text-anchor="middle" fill="#9aa7b8" font-size="11.5">PREVENTED</text>
+          <rect x="240" y="470" width="180" height="58" rx="10" fill="#111722" stroke="#222c3d"/>
+          <text x="330" y="498" text-anchor="middle">Logs / traces</text><text x="330" y="516" text-anchor="middle" fill="#9aa7b8" font-size="11.5">DETECTED</text>
+          <rect x="436" y="470" width="180" height="58" rx="10" fill="#111722" stroke="#222c3d"/>
+          <text x="526" y="498" text-anchor="middle">Alert bus</text><text x="526" y="516" text-anchor="middle" fill="#9aa7b8" font-size="11.5">ALERTED</text>
+          <rect x="632" y="470" width="184" height="58" rx="10" fill="#111722" stroke="#222c3d"/>
+          <text x="724" y="498" text-anchor="middle">Pager / tickets</text><text x="724" y="516" text-anchor="middle" fill="#9aa7b8" font-size="11.5">PAGED · TICKETED</text>
+        </g>
+
+        <!-- signals back up to verification engine (left side return) -->
+        <path d="M44 499 H30 Q18 499 18 487 V234 Q18 216 36 216 H450 V196" fill="none" stroke="#6ea8fe" stroke-width="1.6" stroke-dasharray="5 4" marker-end="url(#ah2)"/>
+        <text x="60" y="232" fill="#6ea8fe" font-family="ui-monospace,Menlo,monospace" font-size="11.5">observed signals → verification</text>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<!-- components -->
+<section class="section section--tight">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="eyebrow">Components</span>
+      <h2 class="section-title">What each piece is responsible for.</h2>
+    </div>
+    <div class="grid grid--3 stagger">
+      <div class="card card--hover"><div class="card__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16M4 12h16M4 18h10"/></svg></div><h3>Catalog</h3><p>The registry of experiments. Each one declares a hypothesis, steady-state probe, the ladder it asserts, SLOs, and framework mappings — as structured data, never executable payloads.</p></div>
+      <div class="card card--hover"><div class="card__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l8 4v6c0 5-3.4 8.6-8 10-4.6-1.4-8-5-8-10V6z"/><path d="M9 12l2 2 4-4"/></svg></div><h3>Safety Governor</h3><p>The single choke point. It evaluates all ten gates and returns a signed decision. No code path dispatches a detonator without <span class="mono">Decision{Allowed:true}</span> — enforced by code and by test.</p></div>
+      <div class="card card--hover"><div class="card__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12h4l2 6 4-14 2 8h6"/></svg></div><h3>Verification Engine</h3><p>Correlates signals to the injection by UUID and grades each rung of the response ladder against its SLO: within SLO, slow, failed, or inconclusive.</p></div>
+      <div class="card card--hover"><div class="card__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/></svg></div><h3>Scoring</h3><p>Rolls verdicts into a weighted per-service efficacy score. Prevention counts most; an expected-but-untested family scores 0.0. The scorecard never flatters.</p></div>
+      <div class="card card--hover"><div class="card__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg></div><h3>Evidence Vault</h3><p>An append-only, Ed25519-signed ledger of every decision, approval, detonation and verdict — tamper-, reorder- and truncation-evident, and verifiable offline.</p></div>
+      <div class="card card--hover"><div class="card__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></div><h3>Agent &amp; Detonators · Signal sources</h3><p>The agent executes a single declared, reversible condition against the target; independent sources — metrics, logs, the alert bus, the pager — report back for verification.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 7 step loop detail -->
+<section class="section">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="eyebrow">The loop · in detail</span>
+      <h2 class="section-title">Seven steps, every run, no exceptions.</h2>
+    </div>
+    <div class="steps stagger">
+      <div class="step"><span class="step__n"></span><div><h3>HYPOTHESIZE</h3><p>Load an experiment from the catalog: its steady-state definition, the adversarial condition, the ladder rungs it asserts, and the SLO for each. A correlation UUID is minted for the run.</p></div></div>
+      <div class="step"><span class="step__n"></span><div><h3>GATE</h3><p>The Safety Governor evaluates all ten gates and proves the system is in steady state. Any refusal denies the run; every reason is recorded. This is the only path to injection.</p></div></div>
+      <div class="step"><span class="step__n"></span><div><h3>ARM</h3><p>A capability credential is minted for exactly this run — narrowly scoped, time-boxed, signed, and auto-expiring. No credential ever outlives its run, and the platform cannot widen its own scope.</p></div></div>
+      <div class="step"><span class="step__n"></span><div><h3>DETONATE</h3><p>The agent injects one pre-declared, bounded, reversible condition against the target — stamped with the correlation UUID so it can never be confused with a real incident.</p></div></div>
+      <div class="step"><span class="step__n"></span><div><h3>OBSERVE</h3><p>Independent signal sources are polled across the ladder — prevented, detected, alerted, paged, ticketed — and matched to the run by UUID, never by timing coincidence.</p></div></div>
+      <div class="step"><span class="step__n"></span><div><h3>REVERT</h3><p>The condition is undone and the revert is independently verified. If an action could not be reverted and the revert checked, the Governor would never have allowed it in the first place.</p></div></div>
+      <div class="step"><span class="step__n"></span><div><h3>ADJUDICATE</h3><p>Each asserted rung is graded against its SLO and the verdict computed — <span class="mono">PASS</span>, <span class="mono">FAIL_OPEN</span>, or <span class="mono">INCONCLUSIVE</span>, never fudged. A signed receipt is written and the scorecard updated.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- the 10 gates -->
+<section class="section" id="gates">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="eyebrow">The Safety Governor</span>
+      <h2 class="section-title">Ten gates. All evaluated. Never short-circuited.</h2>
+      <p class="section-lead">A single refusal denies the run — but every gate is still evaluated, so the full set of reasons is recorded in the ledger. This is the canonical evaluation order.</p>
+    </div>
+    <div class="gatelist stagger">
+      <div class="gate"><span class="gate__n"></span><div><code>KILLSWITCH</code><p>The global kill switch must be disengaged. One switch halts all injection, everywhere, instantly.</p></div></div>
+      <div class="gate"><span class="gate__n"></span><div><code>SEV_ACTIVE</code><p>No active incident may be open for the target's team. Never pile chaos onto a live fire.</p></div></div>
+      <div class="gate"><span class="gate__n"></span><div><code>BLACKOUT</code><p>The current time must fall outside every declared change-freeze / blackout window.</p></div></div>
+      <div class="gate"><span class="gate__n"></span><div><code>PROMOTION</code><p>The experiment must have PASSed in every lower environment within the freshness window. Production is earned, not assumed.</p></div></div>
+      <div class="gate"><span class="gate__n"></span><div><code>CAPABILITY</code><p>The run must carry the exact capability it declares — a narrowly-scoped, time-boxed, signed grant that expires on its own.</p></div></div>
+      <div class="gate"><span class="gate__n"></span><div><code>APPROVAL</code><p>Required approvals must be present; production demands two humans from two distinct teams.</p></div></div>
+      <div class="gate"><span class="gate__n"></span><div><code>BUDGET</code><p>The blast radius — duration, traffic percentage, pod count — must fit the pre-set envelope for that environment and tier.</p></div></div>
+      <div class="gate"><span class="gate__n"></span><div><code>FAULT_DOMAIN</code><p>The target must share no fault domain with any in-flight run. No overlapping blast zones.</p></div></div>
+      <div class="gate"><span class="gate__n"></span><div><code>CONCURRENCY</code><p>A concurrency slot must be free. The platform caps how much can be in flight at once.</p></div></div>
+      <div class="gate"><span class="gate__n"></span><div><code>STEADY_STATE</code><p>The system must be provably in steady state right now, via a configured probe. No steady state, no detonation.</p></div></div>
+    </div>
+    <div class="callout reveal" style="margin-top:28px"><strong>Fail closed and honest.</strong> Production injection is off by default and requires an explicit, signed, time-boxed capability grant plus two-person approval. Alert suppression is capped at 30 minutes and is schema-forbidden from ever covering an alert rule the experiment asserts on.</div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="section section--tight">
+  <div class="wrap">
+    <div class="cta reveal">
+      <h2>Read it in the code.</h2>
+      <p>The charter, the catalog, and the Governor are all in the open. Nothing about the safety story is a promise you have to take on faith.</p>
+      <div class="cta__actions">
+        <a class="btn btn--primary" href="https://github.com/dibakshya01/chaotic-shoebill-stork">Browse the repository →</a>
+        <a class="btn btn--ghost" href="contact.html">Get involved</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="footer">
+  <div class="wrap">
+    <div class="footer__top">
+      <div class="footer__brand">
+        <a class="brand" href="index.html" aria-label="chaotic-shoebill-stork home">
+          <svg viewBox="0 0 40 40" aria-hidden="true"><defs><linearGradient id="fb" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3fd0c9"/><stop offset="1" stop-color="#1b6f6b"/></linearGradient></defs><rect x="2" y="2" width="36" height="36" rx="10" fill="url(#fb)"/><path d="M20 10.4 L26.9 12.9 V18.3 C26.9 22.6 24 25.9 20 27.6 C16 25.9 13.1 22.6 13.1 18.3 V12.9 Z" fill="#fff" fill-opacity=".95"/><path d="M16.7 19.1 L19 21.5 L23.6 15.9" fill="none" stroke="#167a74" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span><b>chaotic-shoebill-stork</b></span>
+        </a>
+        <p>Security Chaos Engineering — prove your security controls actually work. The shoebill stands perfectly still, then strikes with precision.</p>
+      </div>
+      <div class="footer__col">
+        <h5>Project</h5>
+        <a href="https://github.com/dibakshya01/chaotic-shoebill-stork">GitHub</a>
+        <a href="https://github.com/dibakshya01/chaotic-shoebill-stork/tree/main/docs">Docs</a>
+        <a href="https://github.com/dibakshya01/chaotic-shoebill-stork/blob/main/LICENSE">License · Apache-2.0</a>
+      </div>
+      <div class="footer__col">
+        <h5>Learn</h5>
+        <a href="eli5.html">ELI5</a>
+        <a href="architecture.html">Architecture</a>
+        <a href="index.html#how">The 7-step loop</a>
+      </div>
+      <div class="footer__col">
+        <h5>Get involved</h5>
+        <a href="contact.html">Contact</a>
+        <a href="https://github.com/dibakshya01/chaotic-shoebill-stork/issues">Issues</a>
+        <a href="https://github.com/dibakshya01/chaotic-shoebill-stork/blob/main/SECURITY.md">Security policy</a>
+      </div>
+    </div>
+    <div class="footer__bar">
+      <span>© <span data-year>2026</span> chaotic-shoebill-stork contributors · Apache-2.0</span>
+      <span class="footer__tag">Not a red-team tool. No exploits. Every action bounded, reversible, and signed.</span>
+    </div>
+  </div>
+</footer>
+
+<script src="assets/js/site.js" defer></script>
+</body>
+</html>

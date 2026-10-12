@@ -1,0 +1,383 @@
+<!doctype html>
+<html lang="en" class="no-js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>chaotic-shoebill-stork — Security Chaos Engineering</title>
+<meta name="description" content="Security Chaos Engineering — prove your security controls actually work. Safely detonate bounded, reversible adversarial conditions, assert within an SLO, and emit signed evidence into a per-service efficacy scorecard. Open source, Apache-2.0, Go.">
+<meta name="theme-color" content="#0a0e14">
+<meta property="og:title" content="chaotic-shoebill-stork — Security Chaos Engineering">
+<meta property="og:description" content="Prove your security controls actually work. Bounded, reversible, signed.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%233fd0c9'/%3E%3Cstop offset='1' stop-color='%231b6f6b'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect x='2' y='2' width='36' height='36' rx='10' fill='url(%23g)'/%3E%3Cpath d='M20 10.4 L26.9 12.9 V18.3 C26.9 22.6 24 25.9 20 27.6 C16 25.9 13.1 22.6 13.1 18.3 V12.9 Z' fill='%23ffffff' fill-opacity='.95'/%3E%3Cpath d='M16.7 19.1 L19 21.5 L23.6 15.9' fill='none' stroke='%23167a74' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="assets/css/site.css">
+<noscript><style>.reveal,.stagger>*{opacity:1!important;transform:none!important}</style></noscript>
+<script>document.documentElement.className = "js";</script>
+</head>
+<body>
+
+<!-- ===================== NAV ===================== -->
+<header class="nav">
+  <div class="wrap nav__inner">
+    <a class="brand" href="index.html" aria-label="chaotic-shoebill-stork home">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><defs><linearGradient id="nb" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3fd0c9"/><stop offset="1" stop-color="#1b6f6b"/></linearGradient></defs><rect x="2" y="2" width="36" height="36" rx="10" fill="url(#nb)"/><rect x="2.5" y="2.5" width="35" height="35" rx="9.5" fill="none" stroke="#fff" stroke-opacity=".18"/><path d="M20 10.4 L26.9 12.9 V18.3 C26.9 22.6 24 25.9 20 27.6 C16 25.9 13.1 22.6 13.1 18.3 V12.9 Z" fill="#fff" fill-opacity=".95"/><path d="M16.7 19.1 L19 21.5 L23.6 15.9" fill="none" stroke="#167a74" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span><b>chaotic-shoebill-stork</b></span>
+    </a>
+    <button class="nav__toggle" aria-label="Toggle menu" aria-expanded="false" aria-controls="navlinks">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+    </button>
+    <nav class="nav__links" id="navlinks" aria-label="Primary">
+      <a href="index.html" aria-current="page">Home</a>
+      <a href="#how">How it works</a>
+      <a href="architecture.html">Architecture</a>
+      <a href="eli5.html">ELI5</a>
+      <a href="contact.html">Contact</a>
+      <a class="btn btn--ghost btn--sm nav__cta" href="https://github.com/dibakshya01/chaotic-shoebill-stork">GitHub ↗</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+<!-- ===================== HERO ===================== -->
+<section class="hero">
+  <div class="wrap">
+    <div class="hero__grid">
+      <div class="hero__copy">
+        <span class="hero__badge">
+          <span class="dot" aria-hidden="true"></span>
+          Open source · Apache-2.0 · Go
+          <span class="tag">v19 ATT&amp;CK</span>
+        </span>
+        <h1>Prove your security controls <span class="accent">actually work.</span></h1>
+        <p class="hero__lead"><strong>Security Chaos Engineering.</strong> Treat every deployed control as a testable hypothesis, safely detonate a bounded, reversible adversarial condition, and assert whether it prevented, detected, alerted, or paged — within an SLO.</p>
+        <p class="hero__sub">Then emit a signed evidence receipt and roll it into a per-service control-efficacy scorecard. Not a red-team tool. No exploits.</p>
+        <div class="hero__actions">
+          <a class="btn btn--primary" href="#quickstart">Get started
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </a>
+          <a class="btn btn--ghost" href="https://github.com/dibakshya01/chaotic-shoebill-stork">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 00-3.16 19.49c.5.09.68-.22.68-.48l-.01-1.7c-2.78.6-3.37-1.34-3.37-1.34-.46-1.16-1.11-1.47-1.11-1.47-.9-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.9 1.52 2.34 1.08 2.91.83.09-.65.35-1.08.63-1.33-2.22-.25-4.56-1.11-4.56-4.94 0-1.09.39-1.98 1.03-2.68-.1-.26-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02a9.57 9.57 0 015 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.38.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85l-.01 2.75c0 .27.18.58.69.48A10 10 0 0012 2z"/></svg>
+            View on GitHub
+          </a>
+        </div>
+        <div class="hero__meta">
+          <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg> 9 experiment families</span>
+          <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg> Ed25519-signed evidence</span>
+          <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg> Offline &amp; deterministic</span>
+        </div>
+      </div>
+
+      <!-- animated scope visual: patient watcher that strikes -->
+      <div class="scope" aria-hidden="true">
+        <svg class="scope__svg" viewBox="0 0 220 220" fill="none">
+          <defs>
+            <linearGradient id="hg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3fd0c9"/><stop offset="1" stop-color="#1b6f6b"/></linearGradient>
+            <radialGradient id="hglow" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#3fd0c9" stop-opacity=".35"/><stop offset="1" stop-color="#3fd0c9" stop-opacity="0"/></radialGradient>
+            <linearGradient id="hsweep" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#9af0ea" stop-opacity="0"/><stop offset=".5" stop-color="#9af0ea" stop-opacity=".85"/><stop offset="1" stop-color="#9af0ea" stop-opacity="0"/></linearGradient>
+            <clipPath id="badgeClip"><rect x="79" y="79" width="62" height="62" rx="17"/></clipPath>
+          </defs>
+          <!-- static scope backdrop -->
+          <circle cx="110" cy="110" r="100" stroke="#1a2230" stroke-width="1"/>
+          <circle cx="110" cy="110" r="74" stroke="#172030" stroke-width="1"/>
+          <circle cx="110" cy="110" r="48" stroke="#141c29" stroke-width="1"/>
+          <line x1="10" y1="110" x2="210" y2="110" stroke="#141c29"/>
+          <line x1="110" y1="10" x2="110" y2="210" stroke="#141c29"/>
+          <circle cx="110" cy="110" r="70" fill="url(#hglow)"/>
+          <!-- animated radar rings -->
+          <circle class="ring r1" cx="110" cy="110" r="96" stroke="#3fd0c9" stroke-opacity=".55" stroke-width="1.5"/>
+          <circle class="ring r2" cx="110" cy="110" r="96" stroke="#3fd0c9" stroke-opacity=".55" stroke-width="1.5"/>
+          <circle class="ring r3" cx="110" cy="110" r="96" stroke="#6ea8fe" stroke-opacity=".45" stroke-width="1.5"/>
+          <!-- orbiting signal -->
+          <g class="orbit"><circle cx="110" cy="24" r="4" fill="#6ea8fe"/></g>
+          <!-- badge -->
+          <g class="badge-core">
+            <rect x="79" y="79" width="62" height="62" rx="17" fill="url(#hg)"/>
+            <rect x="79.75" y="79.75" width="60.5" height="60.5" rx="16.25" fill="none" stroke="#fff" stroke-opacity=".2"/>
+            <path d="M110 90 L124 95 V107 C124 117 118 124.6 110 128 C102 124.6 96 117 96 107 V95 Z" fill="#fff" fill-opacity=".96"/>
+            <path d="M103.5 108 L108 112.6 L117 101.5" stroke="#167a74" stroke-width="3.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+            <g clip-path="url(#badgeClip)"><rect class="sweep" x="90" y="79" width="40" height="62" fill="url(#hsweep)"/></g>
+          </g>
+        </svg>
+        <div class="scope__pipe">
+          <div class="pipe">
+            <span class="pipe__node n1 on">DETONATE <i></i></span>
+            <span class="pipe__arr">→</span>
+            <span class="pipe__node n2">OBSERVE <i></i></span>
+            <span class="pipe__arr">→</span>
+            <span class="pipe__node n3">VERIFY <i></i></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- ===================== THE GAP ===================== -->
+<section class="section" id="gap">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="eyebrow">The gap</span>
+      <h2 class="section-title">You deployed the control. But does it work?</h2>
+      <p class="section-lead">Most teams learn the honest answer in one of two places: at 3am, mid-incident, when the alert that should have fired never did — or once a year, in an audit, long after it mattered.</p>
+    </div>
+    <div class="gap">
+      <div class="reveal">
+        <ul class="gap__list">
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4m0 4h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L14.7 3.9a2 2 0 00-3.4 0z"/></svg>
+            <span>The WAF rule was disabled in a refactor six months ago. Nobody noticed, because nothing ever tested it.</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4m0 4h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L14.7 3.9a2 2 0 00-3.4 0z"/></svg>
+            <span>Authorization "fails open" when the identity service is unreachable — the single worst failure mode, discovered during the outage.</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4m0 4h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L14.7 3.9a2 2 0 00-3.4 0z"/></svg>
+            <span>The alert fires, but no page reaches a human within the SLO — and the runbook link 404s.</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4m0 4h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L14.7 3.9a2 2 0 00-3.4 0z"/></svg>
+            <span>The only open-source tool that tackled this, ChaoSlingr, was archived in 2019. The tools that solve it — SafeBreach, AttackIQ, Picus, Cymulate — are closed and commercial.</span></li>
+        </ul>
+      </div>
+      <div class="gap__panel reveal">
+        <div class="gap__panel-head"><span class="d"></span><span class="d"></span><span class="d"></span> control-efficacy · posture</div>
+        <div class="gap__verdict">
+          <div class="vrow"><span><span class="svc">payments</span> <span class="mut">· PII tokenization under vault degradation</span></span><span class="pill pill--open">FAIL_OPEN</span></div>
+          <div class="vrow"><span><span class="svc">checkout</span> <span class="mut">· auth under session-service degradation</span></span><span class="pill pill--open">FAIL_OPEN</span></div>
+          <div class="vrow"><span><span class="svc">catalog</span> <span class="mut">· edge rate-limit efficacy</span></span><span class="pill pill--pass">PASS</span></div>
+          <div class="vrow"><span><span class="svc">search</span> <span class="mut">· mTLS downgrade refused</span></span><span class="pill pill--slow">SLOW</span></div>
+          <div class="vrow"><span><span class="svc">profile</span> <span class="mut">· revocation TTL honoured</span></span><span class="pill pill--untested">UNTESTED · 0.0</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== HOW IT WORKS ===================== -->
+<section class="section" id="how">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="eyebrow">How it works</span>
+      <h2 class="section-title">One disciplined loop, seven steps.</h2>
+      <p class="section-lead">Every run follows the same path. The Safety Governor is the only door to injection — nothing detonates without its signed <span class="mono">Decision{Allowed:true}</span>, and every step is written to a signed ledger.</p>
+    </div>
+    <div class="loop stagger">
+      <div class="loop__step"><span class="loop__n"></span><h4>HYPOTHESIZE</h4><p>Declare the control, its steady state, and the SLO it must meet — as data, not a payload.</p></div>
+      <div class="loop__step loop__step--govern"><span class="loop__n"></span><h4>GATE</h4><p>The Safety Governor evaluates all 10 gates. One fails → the run is refused.</p></div>
+      <div class="loop__step"><span class="loop__n"></span><h4>ARM</h4><p>Mint a per-run, capability-scoped, time-boxed, signed credential. It never outlives the run.</p></div>
+      <div class="loop__step loop__step--danger"><span class="loop__n"></span><h4>DETONATE</h4><p>Inject one pre-declared, bounded, reversible adversarial condition. Tagged with a correlation UUID.</p></div>
+      <div class="loop__step"><span class="loop__n"></span><h4>OBSERVE</h4><p>Collect signals across the response ladder: prevented, detected, alerted, paged.</p></div>
+      <div class="loop__step"><span class="loop__n"></span><h4>REVERT</h4><p>Undo the condition and independently verify the revert. No revert → the Governor never allowed it.</p></div>
+      <div class="loop__step"><span class="loop__n"></span><h4>ADJUDICATE</h4><p>Score each rung within SLO, write a signed receipt, update the scorecard. Never lies.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== FAMILIES ===================== -->
+<section class="section section--tight" id="families">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="eyebrow">Coverage</span>
+      <h2 class="section-title">Nine experiment families, mapped to the frameworks.</h2>
+      <p class="section-lead">From the service mesh to agentic AI — each family is a catalog of declared hypotheses, cross-walked to MITRE ATT&amp;CK, OWASP, PCI-DSS, ISO 27001, NIST 800-53, SOC 2 and DPDP.</p>
+    </div>
+    <div class="families stagger">
+      <div class="fam"><span class="fam__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/><circle cx="12" cy="4" r="2"/><path d="M12 6v3M7 17l3-3M17 17l-3-3"/></svg></span><div><h4>Service Mesh</h4><p>mTLS downgrade refusal, zero-trust between workloads.</p></div></div>
+      <div class="fam"><span class="fam__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12h18M12 3a15 15 0 010 18M12 3a15 15 0 000 18"/><circle cx="12" cy="12" r="9"/></svg></span><div><h4>Gateway &amp; Edge</h4><p>Rate limits, WAF signatures, JWT validation, tenant isolation, bypass refusal.</p></div></div>
+      <div class="fam"><span class="fam__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg></span><div><h4>Identity &amp; Secrets</h4><p>Fail-closed authz, revocation TTLs, rotation, leaked-credential canaries.</p></div></div>
+      <div class="fam"><span class="fam__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M4 12h16M4 17h16"/><circle cx="8" cy="7" r="1.4" fill="currentColor"/><circle cx="14" cy="12" r="1.4" fill="currentColor"/><circle cx="10" cy="17" r="1.4" fill="currentColor"/></svg></span><div><h4>Network &amp; Perimeter</h4><p>Segmentation, allowlist drift, direct-to-service reachability.</p></div></div>
+      <div class="fam"><span class="fam__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg></span><div><h4>Data Protection</h4><p>Tokenization, redaction, canary-token boundaries. Fingerprinted canaries only — never real PII.</p></div></div>
+      <div class="fam"><span class="fam__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l8 4v6c0 5-3.4 8.6-8 10-4.6-1.4-8-5-8-10V6z"/><path d="M9 12l2 2 4-4"/></svg></span><div><h4>Supply Chain</h4><p>Artifact provenance, signature verification, build integrity.</p></div></div>
+      <div class="fam"><span class="fam__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 12a9 9 0 11-3-6.7M21 4v5h-5"/></svg></span><div><h4>DR &amp; Resilience</h4><p>Posture survives failover; degradation never widens access.</p></div></div>
+      <div class="fam"><span class="fam__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12h4l2 6 4-14 2 8h6"/></svg></span><div><h4>Detection &amp; Response</h4><p>Rule regression, alert-to-page paths, runbook executability, pipeline integrity.</p></div></div>
+      <div class="fam"><span class="fam__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="8" width="14" height="11" rx="2"/><path d="M12 8V4M9 3h6"/><circle cx="9.5" cy="13" r="1.2" fill="currentColor"/><circle cx="14.5" cy="13" r="1.2" fill="currentColor"/></svg></span><div><h4>AI / Agentic</h4><p>LLM &amp; agent guardrails — OWASP LLM 2025, Agentic ASI 2026, AISVS.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== SCREENS ===================== -->
+<section class="section" id="screens">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="eyebrow">The console</span>
+      <h2 class="section-title">Six screens. One honest picture of your posture.</h2>
+      <p class="section-lead">A built-in operator UI turns every run into something you can read at a glance — and something an auditor can verify without trusting the UI at all.</p>
+    </div>
+    <div class="shots stagger">
+      <figure class="shot">
+        <div class="shot__bar"><i></i><i></i><i></i><span>127.0.0.1:8099 · scorecard</span></div>
+        <div class="shot__img"><img src="assets/img/scorecard.jpg" alt="Posture Scorecard: a grid of services and control families, each cell a pass, slow, untested, fail or fail-open marker, with efficacy, fail-open count, coverage and freshness tiles above." loading="lazy" width="800" height="600"></div>
+        <figcaption class="shot__cap"><h3>Posture Scorecard</h3><p>Every control proven — or visibly not. Untested scores 0.0, as loud as failing.</p></figcaption>
+      </figure>
+      <figure class="shot">
+        <div class="shot__bar"><i></i><i></i><i></i><span>127.0.0.1:8099 · safety</span></div>
+        <div class="shot__img"><img src="assets/img/safety-preview.jpg" alt="Safety Preview: a form to configure an experiment and a list of all ten Safety Governor gates, each shown as passed or failed, with an overall REFUSED verdict." loading="lazy" width="800" height="600"></div>
+        <figcaption class="shot__cap"><h3>Safety Preview</h3><p>Run the Safety Governor without detonating. All ten gates, evaluated at once.</p></figcaption>
+      </figure>
+      <figure class="shot">
+        <div class="shot__bar"><i></i><i></i><i></i><span>127.0.0.1:8099 · fail-open</span></div>
+        <div class="shot__img"><img src="assets/img/failopen.jpg" alt="Fail-Open Board: cards for each control that degraded permissively instead of denying, tagged with severity and the frameworks each maps to." loading="lazy" width="800" height="600"></div>
+        <figcaption class="shot__cap"><h3>Fail-Open Board</h3><p>Controls that degraded permissively instead of denying — the highest-severity class.</p></figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== DIFFERENTIATORS ===================== -->
+<section class="section" id="why">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="eyebrow">Why it's different</span>
+      <h2 class="section-title">Designed to be trusted, not just run.</h2>
+      <p class="section-lead">Five commitments make this more than "chaos for security" — they make the results something you can take to an incident review, or an auditor.</p>
+    </div>
+    <div class="feat stagger">
+      <div class="feat__card lead">
+        <div>
+          <span class="feat__kicker">The Safety Governor</span>
+          <h3>The only door to injection — 10 gates, all evaluated.</h3>
+          <p>Nothing in the codebase dispatches a detonator without a Governor decision. Every gate is evaluated (never short-circuited), production injection is off by default, and no run can widen its own scope. If an action can't be reverted and the revert independently verified, the Governor refuses it.</p>
+        </div>
+        <div class="gates-mini" aria-hidden="true">
+          <span>KILLSWITCH</span><span>SEV_ACTIVE</span>
+          <span>BLACKOUT</span><span>PROMOTION</span>
+          <span>CAPABILITY</span><span>APPROVAL</span>
+          <span>BUDGET</span><span>FAULT_DOMAIN</span>
+          <span>CONCURRENCY</span><span>STEADY_STATE</span>
+        </div>
+      </div>
+      <div class="feat__card">
+        <span class="feat__kicker">Never lie</span>
+        <h3>An unobservable result is never a pass.</h3>
+        <p><span class="mono">FAIL_OPEN</span> is its own verdict — the worst one. <span class="mono">INCONCLUSIVE</span> never becomes <span class="mono">PASS</span>. An expected-but-untested control scores <span class="mono">0.0</span>: untested is not unknown.</p>
+      </div>
+      <div class="feat__card">
+        <span class="feat__kicker">Causality, not coincidence</span>
+        <h3>A correlation UUID in every artifact.</h3>
+        <p>The same UUID is woven through the injection, the signals, and the receipt — so a chaos run can never be mistaken for a real incident, and a "pass" can never be a coincidence.</p>
+      </div>
+      <div class="feat__card">
+        <span class="feat__kicker">Portable evidence</span>
+        <h3>Ed25519-signed receipts an auditor can check.</h3>
+        <p>Every decision, approval, detonation and verdict lands in an append-only, signed ledger — tamper-, reorder- and truncation-evident, and verifiable without trusting this platform's UI or database.</p>
+      </div>
+      <div class="feat__card">
+        <span class="feat__kicker">Runs anywhere</span>
+        <h3>Offline, deterministic, on your laptop.</h3>
+        <p>The whole loop runs with zero external dependencies. <span class="mono">shoebill demo</span> replays a full posture end-to-end — no cloud, no account, no network.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== QUICKSTART ===================== -->
+<section class="section" id="quickstart">
+  <div class="wrap">
+    <div class="quick">
+      <div class="reveal">
+        <span class="eyebrow">Quickstart</span>
+        <h2 class="section-title">Up and running in three commands.</h2>
+        <p class="section-lead">Install the <span class="mono">shoebill</span> binary, replay the demo posture, then open the operator console locally. Nothing leaves your machine.</p>
+        <ul class="quick__points">
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg> Single static Go binary, no runtime dependencies.</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg> Deterministic demo data — safe to run anywhere.</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg> Console serves at <span class="mono">http://127.0.0.1:8099</span>.</li>
+        </ul>
+      </div>
+      <div class="reveal">
+        <div class="terminal">
+          <div class="terminal__bar">
+            <i></i><i></i><i></i><span>shell</span>
+            <button class="copy-btn copy" data-copy="#install-cmds" aria-label="Copy install commands">
+              <svg class="ic-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>
+              <svg class="ic-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg>
+              <span class="copy-label">Copy</span>
+            </button>
+          </div>
+          <div class="terminal__body"><code id="install-cmds" data-copytext="go install github.com/dibakshya01/chaotic-shoebill-stork/cmd/shoebill@latest
+shoebill demo
+shoebill serve --demo"><span class="line"><span class="prompt">$ </span>go install github.com/dibakshya01/chaotic-shoebill-stork/cmd/shoebill@latest</span>
+<span class="line"><span class="prompt">$ </span>shoebill demo</span>
+<span class="line"><span class="prompt">$ </span>shoebill serve --demo    <span class="cmt"># open http://127.0.0.1:8099</span></span></code></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== STANDARDS ===================== -->
+<section class="section section--tight" id="standards">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="eyebrow">Compliance</span>
+      <h2 class="section-title">Mapped to the standards that matter.</h2>
+      <p class="section-lead">Each experiment is cross-walked to the control frameworks your auditors and your security team already live in — so a passing run is also a piece of evidence.</p>
+    </div>
+    <div class="badges reveal">
+      <span class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3 6 6 .9-4.5 4.3 1 6.3L12 16.9 6.5 19.5l1-6.3L3 8.9 9 8z"/></svg><b>MITRE ATT&amp;CK</b> <span>v19</span></span>
+      <span class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><b>OWASP</b> <span>API 2023 · Top 10 2025 · LLM 2025 · Agentic ASI 2026 · AISVS</span></span>
+      <span class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/></svg><b>PCI-DSS</b> <span>v4.0.1</span></span>
+      <span class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 4v6c0 5-3.4 8.6-8 10-4.6-1.4-8-5-8-10V6z"/></svg><b>ISO 27001</b> <span>2022</span></span>
+      <span class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/></svg><b>NIST</b> <span>800-53</span></span>
+      <span class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg><b>SOC 2</b></span>
+      <span class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg><b>DPDP</b></span>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== CTA ===================== -->
+<section class="section section--tight">
+  <div class="wrap">
+    <div class="cta reveal">
+      <h2>Stop assuming. Start proving.</h2>
+      <p>Clone it, run the demo, and see your first control-efficacy scorecard in under a minute — entirely offline.</p>
+      <div class="cta__actions">
+        <a class="btn btn--primary" href="https://github.com/dibakshya01/chaotic-shoebill-stork">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 00-3.16 19.49c.5.09.68-.22.68-.48l-.01-1.7c-2.78.6-3.37-1.34-3.37-1.34-.46-1.16-1.11-1.47-1.11-1.47-.9-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.9 1.52 2.34 1.08 2.91.83.09-.65.35-1.08.63-1.33-2.22-.25-4.56-1.11-4.56-4.94 0-1.09.39-1.98 1.03-2.68-.1-.26-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02a9.57 9.57 0 015 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.38.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85l-.01 2.75c0 .27.18.58.69.48A10 10 0 0012 2z"/></svg>
+          Star on GitHub
+        </a>
+        <a class="btn btn--ghost" href="eli5.html">New to this? Start with the ELI5 →</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ===================== FOOTER ===================== -->
+<footer class="footer">
+  <div class="wrap">
+    <div class="footer__top">
+      <div class="footer__brand">
+        <a class="brand" href="index.html" aria-label="chaotic-shoebill-stork home">
+          <svg viewBox="0 0 40 40" aria-hidden="true"><defs><linearGradient id="fb" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3fd0c9"/><stop offset="1" stop-color="#1b6f6b"/></linearGradient></defs><rect x="2" y="2" width="36" height="36" rx="10" fill="url(#fb)"/><path d="M20 10.4 L26.9 12.9 V18.3 C26.9 22.6 24 25.9 20 27.6 C16 25.9 13.1 22.6 13.1 18.3 V12.9 Z" fill="#fff" fill-opacity=".95"/><path d="M16.7 19.1 L19 21.5 L23.6 15.9" fill="none" stroke="#167a74" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span><b>chaotic-shoebill-stork</b></span>
+        </a>
+        <p>Security Chaos Engineering — prove your security controls actually work. The shoebill stands perfectly still, then strikes with precision.</p>
+      </div>
+      <div class="footer__col">
+        <h5>Project</h5>
+        <a href="https://github.com/dibakshya01/chaotic-shoebill-stork">GitHub</a>
+        <a href="https://github.com/dibakshya01/chaotic-shoebill-stork/tree/main/docs">Docs</a>
+        <a href="https://github.com/dibakshya01/chaotic-shoebill-stork/blob/main/LICENSE">License · Apache-2.0</a>
+      </div>
+      <div class="footer__col">
+        <h5>Learn</h5>
+        <a href="eli5.html">ELI5</a>
+        <a href="architecture.html">Architecture</a>
+        <a href="#how">The 7-step loop</a>
+      </div>
+      <div class="footer__col">
+        <h5>Get involved</h5>
+        <a href="contact.html">Contact</a>
+        <a href="https://github.com/dibakshya01/chaotic-shoebill-stork/issues">Issues</a>
+        <a href="https://github.com/dibakshya01/chaotic-shoebill-stork/blob/main/SECURITY.md">Security policy</a>
+      </div>
+    </div>
+    <div class="footer__bar">
+      <span>© <span data-year>2026</span> chaotic-shoebill-stork contributors · Apache-2.0</span>
+      <span class="footer__tag">Not a red-team tool. No exploits. Every action bounded, reversible, and signed.</span>
+    </div>
+  </div>
+</footer>
+
+<script src="assets/js/site.js" defer></script>
+</body>
+</html>
