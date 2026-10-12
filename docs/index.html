@@ -28,6 +28,7 @@
     </button>
     <nav class="nav__links" id="navlinks" aria-label="Primary">
       <a href="index.html" aria-current="page">Home</a>
+      <a href="#sce">What is SCE?</a>
       <a href="#how">How it works</a>
       <a href="architecture.html">Architecture</a>
       <a href="eli5.html">ELI5</a>
@@ -147,6 +148,28 @@
         </div>
       </div>
     </div>
+  </div>
+</section>
+
+<!-- ===================== WHAT IS SCE ===================== -->
+<section class="section section--tight" id="sce">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="eyebrow">The discipline</span>
+      <h2 class="section-title">What is Security Chaos Engineering?</h2>
+      <p class="section-lead">It's a lesser-known practice, so here's the short version — the idea that you earn confidence in a system not by hoping, but by safely breaking it on purpose and watching whether it holds.</p>
+    </div>
+    <div class="reveal" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;margin-top:8px">
+      <div style="background:#111722;border:1px solid #222c3d;border-radius:14px;padding:22px">
+        <div style="font:600 12px/1.2 ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#6ea8fe;text-transform:uppercase">Chaos Engineering</div>
+        <p style="color:#c6d0dd;margin:12px 0 0;font-size:15px;line-height:1.65">Pioneered at Netflix with "Chaos Monkey," which killed servers in production on purpose. The counter-intuitive insight: you don't build confidence that a system is <em>resilient</em> by assuming it — you inject controlled failure and verify the system withstands it. A fire drill for your infrastructure. It's now a mainstream reliability practice (CNCF's LitmusChaos &amp; Chaos Mesh, AWS Fault Injection Service, Gremlin).</p>
+      </div>
+      <div style="background:#111722;border:1px solid #2a3b42;border-radius:14px;padding:22px;box-shadow:0 0 0 1px rgba(63,208,201,.1)">
+        <div style="font:600 12px/1.2 ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#3fd0c9;text-transform:uppercase">Security Chaos Engineering</div>
+        <p style="color:#c6d0dd;margin:12px 0 0;font-size:15px;line-height:1.65">Apply that exact method to your <strong>security controls</strong> instead of your availability. Coined by Aaron Rinehart; popularized in the O'Reilly book <em>Security Chaos Engineering</em> (Shortridge &amp; Rinehart, 2023). A firewall rule, an authorization policy, a detection alert, a tokenization step — each is a hypothesis ("this will block / detect / alert on that bad thing"). The only way to <em>know</em> it still holds is to safely reproduce the bad thing and watch. SCE replaces assumption with evidence.</p>
+      </div>
+    </div>
+    <p class="reveal" style="color:#9aa7b8;font-size:14.5px;line-height:1.65;margin-top:18px;max-width:74ch">Reliability chaos has mature platforms; <strong style="color:#e6edf3">security chaos has almost none in the open</strong> — the one early attempt (AWS's ChaoSlingr) was archived in 2019, and the tools that do it (SafeBreach, AttackIQ, Picus, Cymulate) are closed and expensive. <span style="color:#3fd0c9;font-weight:600">shoebill</span> is the clean-room, Apache-2.0 platform built for exactly this — with the safety rails and signed evidence that make it trustworthy enough to actually run.</p>
   </div>
 </section>
 

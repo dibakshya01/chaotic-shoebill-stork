@@ -42,6 +42,33 @@ degradation: every fallback path was written and tested for *availability*, almo
 
 **`shoebill` makes control efficacy a continuously-refreshed, signed, honest number.**
 
+## What is (Security) Chaos Engineering?
+
+It's a lesser-known discipline, so here's the short version.
+
+**Chaos Engineering** was pioneered at Netflix (the famous "Chaos Monkey" that randomly killed
+servers in production). The counter-intuitive idea: *you don't build confidence that a system is
+resilient by hoping — you build it by deliberately injecting controlled failure and watching whether
+the system withstands it.* A fire drill for your infrastructure. You form a hypothesis ("if this
+node dies, traffic reroutes and users never notice"), inject the failure in a bounded way, and
+verify the hypothesis held. If it didn't, you found the weakness on your terms, not during a 3 a.m.
+outage. It is now a mainstream reliability practice (CNCF's LitmusChaos and Chaos Mesh, AWS Fault
+Injection Service, Gremlin).
+
+**Security Chaos Engineering (SCE)** applies that exact method to your *security controls* instead of
+your *availability*. The term was coined by Aaron Rinehart and popularized in the O'Reilly book
+*Security Chaos Engineering* (Kelly Shortridge & Aaron Rinehart, 2023). The insight: a firewall rule,
+an authorization policy, a detection alert, or a PII-tokenization step is also just a hypothesis —
+"this control will block / detect / alert on this bad thing" — and the only way to *know* it still
+holds is to safely reproduce the bad thing and watch. Most teams never do; they assume the control
+works because it was configured once. SCE replaces that assumption with evidence.
+
+**Why it's barely tooled.** Reliability chaos has mature platforms; *security* chaos has almost
+none in the open. The one early open-source attempt (AWS's ChaoSlingr) was archived in 2019, and the
+commercial tools that do it (SafeBreach, AttackIQ, Picus, Cymulate) are closed and expensive.
+`shoebill` is a clean-room, Apache-2.0 platform built for this specific job — with the safety rails
+and signed evidence that make it trustworthy enough to actually run.
+
 ## Why this is new
 
 Reliability chaos engineering is mature (LitmusChaos, Chaos Mesh, Gremlin). *Security* chaos
