@@ -1,0 +1,137 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: securitychaosexperiments.chaos.shoebill.dev
+spec:
+  group: chaos.shoebill.dev
+  scope: Namespaced
+  names:
+    kind: SecurityChaosExperiment
+    listKind: SecurityChaosExperimentList
+    plural: securitychaosexperiments
+    singular: securitychaosexperiment
+    shortNames: [sce, scexp]
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      additionalPrinterColumns:
+        - name: Family
+          type: string
+          jsonPath: .spec.family
+        - name: Mode
+          type: string
+          jsonPath: .spec.injection.mode
+        - name: Blast
+          type: string
+          jsonPath: .spec.blastRadiusClass
+      schema:
+        openAPIV3Schema:
+          type: object
+          description: >
+            A reusable Security Chaos Experiment definition: a declarative hypothesis
+            and its assertions. It is DATA, never a payload with side effects.
+          properties:
+            spec:
+              type: object
+              required: [family, description, hypothesis, injection, assertions]
+              properties:
+                family:
+                  type: string
+                  enum: [mesh, gateway, identity, network, data, supplychain, dr, detection, ai]
+                blastRadiusClass:
+                  type: string
+                  enum: [low, medium, high]
+                description:
+                  type: string
+                controls:
+                  type: array
+                  items: {type: string}
+                attackIds:
+                  type: array
+                  items: {type: string}
+                owaspIds:
+                  type: array
+                  items: {type: string}
+                controlFamilies:
+                  type: array
+                  items: {type: string}
+                hypothesis:
+                  type: object
+                  required: [statement]
+                  properties:
+                    statement: {type: string}
+                    steadyState:
+                      type: array
+                      items:
+                        type: object
+                        required: [source, query, expect]
+                        properties:
+                          source: {type: string, enum: [prometheus, alertmanager, http, k8saudit, applog, gwlog, canary, mock]}
+                          query: {type: string}
+                          expect:
+                            type: object
+                            properties:
+                              type: {type: string, enum: [present, absent, threshold, count, value, paged]}
+                              op: {type: string, enum: [gt, gte, lt, lte, eq, neq]}
+                              value: {type: number}
+                injection:
+                  type: object
+                  required: [detonator, mode]
+                  properties:
+                    detonator: {type: string}
+                    mode: {type: string, enum: [inject, observe_only]}
+                    spec:
+                      type: object
+                      x-kubernetes-preserve-unknown-fields: true
+                    duration: {type: string}
+                    reversible: {type: boolean}
+                    revertVerification:
+                      type: object
+                      x-kubernetes-preserve-unknown-fields: true
+                assertions:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: object
+                    required: [stage, source, query, expect]
+                    properties:
+                      stage: {type: string, enum: [PREVENTED, DETECTED, ALERTED, PAGED, TICKETED]}
+                      source: {type: string, enum: [prometheus, alertmanager, http, k8saudit, applog, gwlog, canary, mock]}
+                      query: {type: string}
+                      expect:
+                        type: object
+                        properties:
+                          type: {type: string, enum: [present, absent, threshold, count, value, paged]}
+                          op: {type: string, enum: [gt, gte, lt, lte, eq, neq]}
+                          value: {type: number}
+                      sloMs: {type: integer}
+                      requireUuid: {type: boolean}
+                      justification: {type: string}
+                      securityRelevant: {type: boolean}
+                blastRadius:
+                  type: object
+                  properties:
+                    maxPods: {type: integer}
+                    maxPctReplicas: {type: integer}
+                    maxDurationSeconds: {type: integer}
+                    maxTrafficPct: {type: integer}
+                    requiresDistinctFaultDomains: {type: boolean}
+                expectedNoise:
+                  type: array
+                  items: {type: string}
+                promotion:
+                  type: object
+                  properties:
+                    requiresPassIn:
+                      type: array
+                      items: {type: string}
+                    withinDays: {type: integer}
+                capabilities:
+                  type: array
+                  items: {type: string}
+            status:
+              type: object
+              x-kubernetes-preserve-unknown-fields: true
+      subresources:
+        status: {}
