@@ -1,0 +1,37 @@
+# ---------------------------------------------------------------------------
+# PRIVACY: the original solutioning document is employer-internal / confidential
+# and must NEVER be committed to this public repository. Keep it local only.
+chaotic-shoebill-stork.md
+*.internal.md
+_private/
+LAUNCH.md
+
+# Build output
+/bin/
+/dist/
+*.exe
+*.test
+*.out
+coverage.out
+coverage.html
+
+# Local state produced by the platform (evidence ledger, sqlite db, demo data)
+*.db
+*.db-journal
+/.shoebill/
+/data/
+evidence/*.jsonl
+!evidence/.gitkeep
+
+# Go
+/vendor/
+
+# Web UI build artifacts (source lives in web/, embedded assets are committed)
+/web/node_modules/
+/web/dist/
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp

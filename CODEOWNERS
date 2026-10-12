@@ -1,0 +1,16 @@
+# Code ownership and required review.
+# The safety- and evidence-critical packages require extra scrutiny: a change that
+# weakens a safety invariant must be caught in review, not in production.
+
+# Default owner
+*                               @dibakshya01
+
+# Safety-critical: the only path to injection. Treat every diff here as load-bearing.
+/internal/safety/               @dibakshya01
+/internal/engine/               @dibakshya01
+
+# Evidence integrity: signed receipts an auditor relies on.
+/internal/evidence/             @dibakshya01
+
+# The charter is the project's boundary; changing it is a governance decision.
+/CHARTER.md                     @dibakshya01

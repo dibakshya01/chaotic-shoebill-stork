@@ -1,0 +1,23 @@
+chaotic-shoebill-stork
+Copyright 2026 The chaotic-shoebill-stork Authors
+
+This product includes software developed by the chaotic-shoebill-stork Authors
+and the open-source community.
+
+Licensed under the Apache License, Version 2.0. See the LICENSE file.
+
+This project is a clean-room, vendor-neutral open-source work. It is not
+affiliated with, endorsed by, or derived from the internal systems of any
+employer or company. Any resemblance to a specific organization's internal
+architecture is coincidental; all control names in the experiment catalog are
+generic, industry-standard concepts (service mesh, API gateway, KMS, etc.).
+
+The design draws on publicly described ideas from the Security Chaos Engineering
+community, including:
+  - "Security Chaos Engineering" by Kelly Shortridge & Aaron Rinehart (O'Reilly).
+  - The UUID-correlation detonate-then-assert pattern popularized by Datadog's
+    open-source Threatest and Stratus Red Team projects.
+  - The reusable-definition / bound-intent CRD separation popularized by the
+    CNCF LitmusChaos and Chaos Mesh projects.
+These are credited as inspiration; no third-party code is vendored here unless
+listed in go.mod with its own upstream license.
