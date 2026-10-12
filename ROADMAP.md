@@ -14,20 +14,23 @@ full loop offline; the items below are the path to running real detonations acro
   HTTP, mock).
 - Runs anywhere: single static binary, container image, VM, or Kubernetes pod (see `deploy/`).
 
-## Next — the Kubernetes operator (real in-cluster detonation)
+## The Kubernetes operator (in-cluster detonation)
 
-The highest-value next milestone. The CRDs are ready to apply and the controller is scaffolded.
+The controller is now **implemented and unit-tested** (fake clients), not a skeleton. See
+[`operator/`](operator/).
 
-- [ ] Implement the real infrastructure detonators with `client-go`: `k8s` (container-kill, pod
-      delete), `istio` (PeerAuthentication / AuthorizationPolicy drift & bypass), `netpol`
-      (NetworkPolicy isolation), `cert`.
-- [ ] Wire the controller's `ControlPlane` interface to the Safety Governor + engine, and mint the
-      per-experiment, time-boxed, narrowly-scoped identity (never a standing grant).
-- [ ] The agent-side **autonomous dead-man's switch** (`agent.DeadMansSwitch.Run`) running
-      independently of the control plane — this is where "cannot cause an incident by being down"
-      becomes true on live infrastructure. (In the in-process engine today it is a synchronous
-      forced-revert; the autonomous silence-detector is unit-tested but not yet driven.)
-- [ ] A Helm chart + RBAC, and end-to-end tests against a `kind` cluster (controller-runtime + envtest).
+- [x] Controller `ControlPlane` wired to the Safety Governor + engine (Plan → gate, Execute → run);
+      the reconciler never injects directly (fake-client reconcile tests pass).
+- [x] A real, reversible `client-go` detonator: `netpol` (deny-all-ingress NetworkPolicy, labelled
+      with the run UUID, revert deletes it, independently verified) — fake-clientset tests pass.
+- [x] Generated CRDs + deepcopy (controller-gen), RBAC (least-privilege), manager Deployment, Dockerfile.
+- [ ] **End-to-end against a real cluster** (kind/EKS/GKE/AKS) — the one thing not yet verified.
+- [ ] More real detonators: `istio` (PeerAuthentication/AuthorizationPolicy drift & bypass), `dns`,
+      `cert`, pod-kill.
+- [ ] A fully independent agent that drives the **autonomous dead-man's switch** out-of-process —
+      this is where "cannot cause an incident by being down" becomes true on live infra. (In-process
+      today it is a synchronous forced-revert; the autonomous silence-detector is unit-tested.)
+- [ ] A Helm chart and envtest-based e2e tests.
 
 ## Then — cloud attack coverage (AWS / Azure / GCP)
 

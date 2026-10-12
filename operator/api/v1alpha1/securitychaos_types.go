@@ -2,6 +2,7 @@ package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // --- SecurityChaosExperiment: the reusable definition --------------------------
@@ -30,11 +31,11 @@ type Hypothesis struct {
 type Injection struct {
 	Detonator string `json:"detonator"`
 	// +kubebuilder:validation:Enum=inject;observe_only
-	Mode               string               `json:"mode"`
-	Spec               *runtimeRawExtension `json:"spec,omitempty"`
-	Duration           string               `json:"duration,omitempty"`
-	Reversible         bool                 `json:"reversible,omitempty"`
-	RevertVerification *Probe               `json:"revertVerification,omitempty"`
+	Mode               string                `json:"mode"`
+	Spec               *runtime.RawExtension `json:"spec,omitempty"`
+	Duration           string                `json:"duration,omitempty"`
+	Reversible         bool                  `json:"reversible,omitempty"`
+	RevertVerification *Probe                `json:"revertVerification,omitempty"`
 }
 
 // Assertion is one ladder rung checked after detonation.
@@ -148,14 +149,14 @@ type Approval struct {
 
 // SecurityChaosRunSpec is the run intent.
 type SecurityChaosRunSpec struct {
-	ExperimentRef       string               `json:"experimentRef"`
-	ExperimentVersion   int                  `json:"experimentVersion,omitempty"`
-	Target              Target               `json:"target"`
-	Scope               Scope                `json:"scope,omitempty"`
-	Approvals           []Approval           `json:"approvals,omitempty"`
-	Parameters          *runtimeRawExtension `json:"parameters,omitempty"`
-	Schedule            string               `json:"schedule,omitempty"`
-	GrantedCapabilities []string             `json:"grantedCapabilities,omitempty"`
+	ExperimentRef       string                `json:"experimentRef"`
+	ExperimentVersion   int                   `json:"experimentVersion,omitempty"`
+	Target              Target                `json:"target"`
+	Scope               Scope                 `json:"scope,omitempty"`
+	Approvals           []Approval            `json:"approvals,omitempty"`
+	Parameters          *runtime.RawExtension `json:"parameters,omitempty"`
+	Schedule            string                `json:"schedule,omitempty"`
+	GrantedCapabilities []string              `json:"grantedCapabilities,omitempty"`
 }
 
 // SecurityChaosRunStatus is the observed run state.
@@ -192,11 +193,6 @@ type SecurityChaosRunList struct {
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []SecurityChaosRun `json:"items"`
 }
-
-// runtimeRawExtension is a thin alias documented here to avoid importing
-// k8s.io/apimachinery/pkg/runtime in this trimmed source; controller-gen users should
-// replace it with *runtime.RawExtension. See operator/README.md.
-type runtimeRawExtension = map[string]interface{}
 
 func init() {
 	SchemeBuilder.Register(&SecurityChaosExperiment{}, &SecurityChaosExperimentList{},

@@ -44,9 +44,11 @@ committed.
 - The control plane — Safety Governor, verification engine, scoring, evidence, CLI, API, dashboard —
   is fully built and unit-tested offline.
 - The "cannot cause an incident by being down" property (capability gate + dead-man's switch) is
-  **demonstrated against the in-process mock environment** in v1. The real-infrastructure detonators
-  and agent that would enforce it on a live cluster live in the [operator](../operator) module, which
-  is scaffolding (ready-to-apply CRDs + a controller skeleton), **not** end-to-end verified here.
+  **demonstrated against the in-process mock environment** in v1 (synchronous forced-revert). The
+  [operator](../operator) module is now **implemented and unit-tested with fake clients** — a real
+  client-go `netpol` detonator plus the reconciler that delegates to the Safety Governor — but is
+  **not yet end-to-end-verified against a live cluster**, and the fully-independent agent that would
+  drive the autonomous silence-revert out-of-process is still future work (see ../ROADMAP.md).
 - **Game Day** is a read-only view in v1 (it groups a sequence of runs); authoring/launching a game
   day from the UI is deferred.
 

@@ -1,60 +1,79 @@
 # chaotic-shoebill-stork — Kubernetes operator
 
-This directory holds the Kubernetes integration: two Custom Resource Definitions and a
-controller that reconciles runs by **delegating authorization to the control plane's
-Safety Governor** — the operator is one more door that opens only when the Governor
-says so, never a bypass.
+The Kubernetes integration: two CRDs and a controller that reconciles runs by
+**delegating authorization to the control plane's Safety Governor** — one more door that
+opens only when the Governor says so, never a bypass.
 
-> **Status: scaffolding.** The CRD manifests in `config/crd/` are complete and
-> ready to apply. The Go API types and the controller are provided as source for
-> `controller-gen` / `kubebuilder`; they are a **separate Go module** so their heavy
-> dependency tree never touches the core build, and they are **not compiled or
-> end-to-end verified in this repository's CI** (that needs a cluster + envtest). The
-> fully-built, fully-tested product is the control plane in the repository root.
+> **Status: implemented and unit-tested; not yet end-to-end-verified against a live
+> cluster.** The controller, the CRD↔model bridge, and a real client-go detonator are
+> built and tested with fake clients (`go test ./...` green). What still needs a real
+> cluster (so it is honestly *not* claimed as verified here): applying it to a kind/EKS/
+> GKE/AKS cluster and running an experiment against real workloads + real Prometheus/
+> Alertmanager. This is a **separate Go module** so its heavy client-go/controller-runtime
+> dependency tree never touches the core build.
 
 ## What's here
 
 ```
-config/crd/      Ready-to-apply CustomResourceDefinitions (chaos.shoebill.dev/v1alpha1)
-                   - SecurityChaosExperiment  (the reusable definition)
-                   - SecurityChaosRun         (bind a definition to a target)
-api/v1alpha1/    Go API types (source for controller-gen deepcopy + manifests)
-internal/controller/  The SecurityChaosRun reconciler skeleton
+api/v1alpha1/          CRD Go types + generated deepcopy (controller-gen)
+config/crd/            Generated CustomResourceDefinitions (ready to apply)
+config/rbac.yaml       ServiceAccount + least-privilege ClusterRole + binding
+config/manager.yaml    The operator Deployment (non-root, probes, resource limits)
+config/kustomization.yaml   apply the whole thing
+internal/controller/   SecurityChaosRun reconciler (+ fake-client tests)
+internal/controlplane/ CRD <-> core-model bridge; Plan (gate) then Execute (+ tests)
+internal/detonators/   the real `netpol` detonator (client-go) (+ fake-clientset tests)
+cmd/manager/           the manager entrypoint (wires governor + engine + detonators)
+Dockerfile             builds the manager image (from the repo root)
 ```
 
-## The CRDs
+## How reconciliation works (the one-door invariant across the cluster boundary)
 
-Apply them to any cluster:
+1. The controller fetches the `SecurityChaosRun` and its referenced
+   `SecurityChaosExperiment`.
+2. It calls `ControlPlane.Plan` → the **Safety Governor** evaluates all 10 gates. If
+   refused, the run's status becomes `Refused` with the reasons and **nothing is
+   injected**.
+3. Only if allowed, it calls `ControlPlane.Execute` → the core **engine** runs the loop
+   (arm → detonate → observe → revert → adjudicate → sign), and the signed verdict,
+   finding and receipt id land in the run's `.status`.
 
-```bash
-kubectl apply -f config/crd/
-```
+The controller never injects directly; the capability each detonator acts on is signed
+by the Governor, not the operator.
 
-- `SecurityChaosExperiment` (`sce`) — a declarative hypothesis + assertions. Data, not
-  a payload.
-- `SecurityChaosRun` (`scr`) — binds an experiment to a target. Its `.status` carries
-  the phase, verdict, finding, and signed receipt id.
+## The `netpol` detonator
 
-## Building the controller (cluster-dev environment)
+A real, bounded, reversible action: it applies a **deny-all-ingress NetworkPolicy** to
+the target pods (isolating them, to ask "does the control fail closed when its
+dependency is unreachable?"), labels it with the run UUID, and `Revert` deletes it.
+`VerifyReverted` confirms via an independent `List`. It verifies the governor-minted
+capability (signature, expiry, target, action scope) before acting.
 
-1. Install [kubebuilder](https://book.kubebuilder.io/) / `controller-gen`.
-2. Replace the `runtimeRawExtension` alias in `api/v1alpha1/securitychaos_types.go`
-   with `*runtime.RawExtension` (it is a trimmed stand-in so the source reads cleanly
-   without the full apimachinery import until you generate).
-3. Generate deepcopy + manifests, then build:
+## Build, generate, deploy
+
+Requires Go 1.24+ and (for regeneration) `controller-gen`.
 
 ```bash
 cd operator
-go mod tidy
+go build ./...                 # builds the whole operator
+go test ./...                  # fake-client reconcile + detonator + converter tests
+
+# regenerate deepcopy + CRDs after changing api/v1alpha1 types:
 controller-gen object paths=./api/...
-controller-gen crd paths=./api/... output:crd:dir=config/crd
-go build ./...
+controller-gen crd:allowDangerousTypes=true paths=./api/... output:crd:dir=config/crd
+
+# build the image (from the repo root so the replace to the core module resolves):
+docker build -f operator/Dockerfile -t ghcr.io/dibakshya01/shoebill-operator:dev .
+
+# deploy to a cluster:
+kubectl apply -k operator/config/
 ```
 
-## Why delegate instead of embed
+Then create a `SecurityChaosExperiment` + a `SecurityChaosRun` (see the catalog for
+experiment shapes) and watch `kubectl get securitychaosruns -o wide`.
 
-The reconciler calls a `ControlPlane` interface (`Plan` then `Execute`). The control
-plane owns the Safety Governor, the signed capability minting, and the evidence ledger.
-Keeping that out of the controller means the "one door to injection" invariant holds
-across the cluster boundary: a reconciler cannot detonate without an allowed decision,
-and the capability it would act on is signed by the Governor, not the operator.
+## What's next (see ../ROADMAP.md)
+
+More real detonators (`istio`, `dns`, `cert`), a fully independent agent that drives the
+autonomous dead-man's switch (silence-revert) out-of-process, a Helm chart, and
+end-to-end tests against a `kind` cluster with envtest.

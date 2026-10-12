@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>shoebill — launch</title>
+<style>
+  :root{
+    --bg:#0a0e14; --panel:#111722; --panel2:#141c29; --line:#222c3d;
+    --ink:#e6edf3; --muted:#9aa7b8; --teal:#3fd0c9; --tealDeep:#1b6f6b;
+    --tealLight:#9af0ea; --blue:#6ea8fe; --green:#3fb950; --amber:#d29922; --red:#f85149;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{background:var(--bg);overflow:hidden}
+  #stage{
+    position:relative;width:1920px;height:1080px;background:var(--bg);
+    color:var(--ink);font-family:var(--sans);overflow:hidden;
+  }
+  .scene{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;will-change:opacity,transform}
+  .wrap{position:absolute;left:150px;right:150px;top:140px;bottom:140px}
+  .grid{position:absolute;inset:0;opacity:.5;
+    background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);
+    background-size:64px 64px;mask-image:radial-gradient(ellipse 70% 70% at 50% 45%,#000 30%,transparent 80%)}
+  .vignette{position:absolute;inset:0;pointer-events:none;
+    background:radial-gradient(ellipse 90% 75% at 50% 42%,transparent 55%,rgba(0,0,0,.55) 100%)}
+  .kicker{font-family:var(--mono);letter-spacing:.28em;text-transform:uppercase;font-size:24px;color:var(--teal)}
+  .big{font-weight:800;line-height:1.02;letter-spacing:-.02em}
+  .mono{font-family:var(--mono)}
+  .corner{position:absolute;left:150px;top:70px;font-family:var(--mono);font-size:22px;color:var(--muted);letter-spacing:.04em}
+  .corner b{color:var(--teal)}
+  .caret{display:inline-block;width:.6ch;background:var(--teal);color:transparent;margin-left:.08em;border-radius:2px}
+  .card{position:absolute;top:0;width:620px;padding:40px 44px;border:1px solid var(--line);border-radius:18px;background:linear-gradient(180deg,var(--panel2),var(--panel))}
+  .card h3{font-family:var(--mono);font-size:30px;color:var(--ink);margin-bottom:14px}
+  .card p{font-size:26px;line-height:1.4;color:var(--muted)}
+  .chip{position:absolute;top:0;display:flex;align-items:center;justify-content:center;height:92px;border:1px solid var(--line);border-radius:14px;background:var(--panel);font-family:var(--mono);font-size:21px;letter-spacing:.04em;color:var(--ink);white-space:nowrap;padding:0 10px}
+  .ladder-row{position:absolute;left:0;display:flex;align-items:center;gap:28px;font-family:var(--mono)}
+  .ladder-row .q{font-size:46px;letter-spacing:.02em;width:360px}
+  .mark{font-size:52px;font-weight:700}
+  .stamp{position:absolute;right:40px;top:50%;transform:translateY(-50%);border:5px solid var(--red);color:var(--red);
+    font-family:var(--mono);font-weight:800;font-size:92px;letter-spacing:.02em;padding:18px 34px;border-radius:16px;
+    background:rgba(248,81,73,.06)}
+  .sc{position:absolute;left:0;right:0;top:0;border:1px solid var(--line);border-radius:20px;background:linear-gradient(180deg,var(--panel2),var(--panel));padding:44px 54px;font-family:var(--mono)}
+  .sc .hd{font-size:30px;color:var(--ink);margin-bottom:8px}
+  .sc .hd .lbl{color:var(--muted)}
+  .sc .cols{display:grid;grid-template-columns:260px repeat(6,1fr) 160px;font-size:22px;color:var(--muted);margin:26px 0 10px;letter-spacing:.02em}
+  .sc .row{display:grid;grid-template-columns:260px repeat(6,1fr) 160px;align-items:center;font-size:30px;height:66px;border-top:1px solid var(--line)}
+  .sc .row .svc{color:var(--ink)}
+  .sc .row .tier{color:var(--muted);font-size:22px}
+  .sc .row .score{text-align:right;font-weight:700}
+  .g{font-size:30px}
+  .pass{color:var(--green)} .slow{color:var(--amber)} .untested{color:var(--muted)} .fail{color:var(--red)} .teal{color:var(--teal)}
+  .brandrow{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);text-align:center}
+  .feather{font-size:120px;line-height:1}
+  .ul{height:8px;background:var(--teal);border-radius:6px;margin:34px auto 0}
+  .pill{display:inline-block;font-family:var(--mono);font-size:24px;color:var(--teal);border:1px solid var(--tealDeep);border-radius:999px;padding:8px 20px}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="grid" id="grid"></div>
+
+  <!-- persistent corner mark -->
+  <div class="corner" id="corner"><b>shoebill</b> · security chaos engineering</div>
+
+  <!-- 1 HOOK -->
+  <div class="scene" id="s_hook">
+    <div class="wrap" style="display:flex;flex-direction:column;justify-content:center">
+      <div class="kicker" id="hook_k">a hypothesis you never test</div>
+      <div class="big" id="hook_l1" style="font-size:76px;color:var(--ink);margin-top:26px">Your security controls worked last quarter.</div>
+      <div class="big" id="hook_l2" style="font-size:118px;color:var(--teal);margin-top:18px">Do they still?<span class="caret" id="caret">|</span></div>
+    </div>
+  </div>
+
+  <!-- 2 SETUP -->
+  <div class="scene" id="s_setup">
+    <div class="wrap">
+      <div class="kicker" id="setup_k">today you only find out two ways</div>
+      <div class="card" id="card1" style="left:0">
+        <h3>▲ 3 a.m. incident</h3>
+        <p>A control that passed last quarter silently decayed — and you learn it mid-outage.</p>
+      </div>
+      <div class="card" id="card2" style="right:0">
+        <h3>▲ annual audit</h3>
+        <p>Samples <span style="color:var(--ink)">configuration</span> — the intent. Never the runtime behavior.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3 TURN -->
+  <div class="scene" id="s_turn">
+    <div class="wrap">
+      <div class="kicker" id="turn_k" style="text-align:center">or you prove it — one governed loop</div>
+      <div id="loopline" style="position:absolute;left:0;right:0;top:300px;height:3px;background:var(--tealDeep);transform-origin:left center"></div>
+      <div id="chips"></div>
+    </div>
+  </div>
+
+  <!-- 4 PAYOFF -->
+  <div class="scene" id="s_payoff">
+    <div class="wrap">
+      <div class="kicker" id="pay_k">observe the ladder — correlated on one run UUID</div>
+      <div id="ladder" style="position:absolute;left:0;top:150px"></div>
+      <div class="stamp" id="stamp">FAIL_OPEN</div>
+    </div>
+  </div>
+
+  <!-- 5 PROOF -->
+  <div class="scene" id="s_proof">
+    <div class="wrap">
+      <div class="kicker" id="pf_k">rolled into a signed, per-service scorecard</div>
+      <div class="sc" id="scorecard" style="top:92px">
+        <div class="hd"><span id="sc_eff">Efficacy 53%</span>
+          <span class="lbl">  ·  Fail-open <span class="fail">3 open</span>  ·  Coverage 17/21  ·  Freshness 100%</span></div>
+        <div class="cols"><span>service</span><span>Mesh</span><span>Gwy</span><span>Idnt</span><span>Netw</span><span>Data</span><span>Detc</span><span style="text-align:right">score</span></div>
+        <div id="rows"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 6 LAND -->
+  <div class="scene" id="s_land">
+    <div class="wrap">
+      <div class="brandrow">
+        <div class="feather" id="feather">🪶</div>
+        <div class="big" id="brandname" style="font-size:104px;color:var(--ink);margin-top:6px">shoebill</div>
+        <div id="tagline" style="font-size:34px;color:var(--muted);margin-top:22px">Security Chaos Engineering — with signed, verifiable evidence.</div>
+        <div class="ul" id="underline" style="width:0px"></div>
+        <div id="meta" style="margin-top:40px">
+          <span class="pill">Apache-2.0</span>
+          <span class="mono" style="font-size:26px;color:var(--teal);margin-left:22px">github.com/dibakshya01/chaotic-shoebill-stork</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="vignette"></div>
+</div>
+
+<script>
+(() => {
+  const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
+  const lerp=(a,b,t)=>a+(b-a)*t;
+  const easeOut=t=>1-Math.pow(1-clamp(t,0,1),3);
+  const easeInOut=t=>{t=clamp(t,0,1);return t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2};
+  const back=t=>{t=clamp(t,0,1);const c1=1.70158,c3=c1+1;return 1+c3*Math.pow(t-1,3)+c1*Math.pow(t-1,2)};
+  // visibility envelope for a scene window, with crossfade in/out
+  const vis=(t,s,e,f=260)=>clamp((t-s)/f,0,1)*clamp((e-t)/f,0,1);
+  const px=n=>n+'px';
+  const $=id=>document.getElementById(id);
+
+  // ---- build repeated elements once ----
+  const LOOP=['HYPOTHESIZE','GATE','ARM','DETONATE','OBSERVE','REVERT','ADJUDICATE'];
+  const chips=$('chips'); const N=LOOP.length; const gap=24; const totalW=1620;
+  const chipW=(totalW-gap*(N-1))/N;
+  LOOP.forEach((label,i)=>{
+    const c=document.createElement('div');
+    c.className='chip'; c.textContent=label;
+    c.style.left=px(i*(chipW+gap)); c.style.width=px(chipW); c.style.top='254px';
+    if(label==='DETONATE'){c.style.borderColor='var(--teal)';c.style.color='var(--teal)'}
+    chips.appendChild(c);
+  });
+
+  const LAD=[['PREVENTED?','✗','fail'],['DETECTED?','✓','pass'],['ALERTED?','✓','pass'],['PAGED?','✓','pass']];
+  const ladder=$('ladder');
+  LAD.forEach((r,i)=>{
+    const row=document.createElement('div'); row.className='ladder-row'; row.dataset.i=i;
+    row.style.top=px(i*118);
+    row.innerHTML=`<span class="q">${r[0]}</span><span class="mark ${r[2]}">${r[1]}</span>`;
+    ladder.appendChild(row);
+  });
+
+  // scorecard rows: [svc,tier,[6 glyph+class],score,scoreClass]
+  const ROWS=[
+    ['checkout','T1',[['●','pass'],['✖','fail'],['●','pass'],['','untested'],['●','pass'],['○','untested']],'0.40','fail'],
+    ['payments','T1',[['●','pass'],['●','pass'],['●','pass'],['','untested'],['✖','fail'],['●','pass']],'0.40','fail'],
+    ['catalog','T2',[['●','pass'],['●','pass'],['','untested'],['○','untested'],['','untested'],['◐','slow']],'0.71','teal'],
+  ];
+  const rowsEl=$('rows');
+  ROWS.forEach((r,i)=>{
+    const d=document.createElement('div'); d.className='row'; d.dataset.i=i;
+    let cells=`<span class="svc">${r[0]} <span class="tier">${r[1]}</span></span>`;
+    r[2].forEach(g=>cells+=`<span class="g ${g[1]}">${g[0]}</span>`);
+    cells+=`<span class="score ${r[4]}">${r[3]}</span>`;
+    d.innerHTML=cells; rowsEl.appendChild(d);
+  });
+
+  const scenes={
+    hook:[0,2600], setup:[2600,6200], turn:[6200,9600],
+    payoff:[9600,13600], proof:[13600,17400], land:[17400,20000],
+  };
+
+  function seek(t){
+    // global ambience — slow drift zoom on the grid
+    $('grid').style.transform=`scale(${lerp(1.0,1.08,t/20000)})`;
+    $('grid').style.opacity=0.5;
+    $('corner').style.opacity=t<300?0:(t>19200?clamp((20000-t)/600,0,1):0.9);
+
+    // ---- 1 HOOK ----
+    {const[s,e]=scenes.hook; const sc=$('s_hook'); const o=vis(t,s,e,300); sc.style.opacity=o;
+     const l=t-s;
+     $('hook_k').style.opacity=easeOut(l/400);
+     const p1=easeOut((l-350)/650);
+     $('hook_l1').style.opacity=p1; $('hook_l1').style.transform=`translateY(${px((1-p1)*26)})`;
+     const p2=easeOut((l-900)/650);
+     $('hook_l2').style.opacity=p2; $('hook_l2').style.transform=`translateY(${px((1-p2)*34)}) scale(${lerp(.96,1,p2)})`;
+     $('caret').style.opacity=(l>1500 && Math.floor(l/450)%2===0)?1:0.15;
+    }
+
+    // ---- 2 SETUP ----
+    {const[s,e]=scenes.setup; const sc=$('s_setup'); sc.style.opacity=vis(t,s,e); const l=t-s;
+     $('setup_k').style.opacity=easeOut(l/400);
+     const a=easeOut((l-300)/700), b=easeOut((l-620)/700);
+     $('card1').style.opacity=a; $('card1').style.transform=`translateY(${px(120+(1-a)*50)})`;
+     $('card2').style.opacity=b; $('card2').style.transform=`translateY(${px(120+(1-b)*50)})`;
+    }
+
+    // ---- 3 TURN ----
+    {const[s,e]=scenes.turn; const sc=$('s_turn'); sc.style.opacity=vis(t,s,e); const l=t-s;
+     $('turn_k').style.opacity=easeOut(l/400);
+     const draw=easeInOut((l-300)/2400);
+     $('loopline').style.transform=`scaleX(${draw})`;
+     [...chips.children].forEach((c,i)=>{
+       const start=450+i*230; const p=easeOut((l-start)/520);
+       c.style.opacity=p;
+       c.style.transform=`translateY(${px((1-p)*34)}) scale(${lerp(.9,1,back(clamp((l-start)/560,0,1)))})`;
+     });
+    }
+
+    // ---- 4 PAYOFF ----
+    {const[s,e]=scenes.payoff; const sc=$('s_payoff'); sc.style.opacity=vis(t,s,e); const l=t-s;
+     $('pay_k').style.opacity=easeOut(l/400);
+     [...ladder.children].forEach((row,i)=>{
+       const start=350+i*360; const p=easeOut((l-start)/420);
+       row.style.opacity=p; row.style.transform=`translateX(${px((1-p)*-40)})`;
+       const mark=row.querySelector('.mark');
+       const mp=easeOut((l-(start+260))/320);
+       mark.style.opacity=mp; mark.style.transform=`scale(${lerp(.4,1,back(clamp((l-(start+260))/360,0,1)))})`;
+     });
+     // verdict stamp slams after ladder
+     const sp=clamp((l-1900)/260,0,1);
+     const punch=l>1900 && l<2060 ? 1+0.06*(1-(l-1900)/160) : 1;
+     $('stamp').style.opacity=sp;
+     $('stamp').style.transform=`translateY(-50%) rotate(-7deg) scale(${lerp(1.5,1,easeOut(sp))*punch})`;
+    }
+
+    // ---- 5 PROOF ----
+    {const[s,e]=scenes.proof; const sc=$('s_proof'); sc.style.opacity=vis(t,s,e); const l=t-s;
+     $('pf_k').style.opacity=easeOut(l/400);
+     const card=easeOut((l-250)/600);
+     $('scorecard').style.opacity=card; $('scorecard').style.transform=`translateY(${px((1-card)*40)})`;
+     [...rowsEl.children].forEach((row,i)=>{
+       const start=650+i*280; const p=easeOut((l-start)/460);
+       row.style.opacity=p; row.style.transform=`translateY(${px((1-p)*22)})`;
+     });
+    }
+
+    // ---- 6 LAND ----
+    {const[s,e]=scenes.land; const sc=$('s_land'); sc.style.opacity=vis(t,s,e,300); const l=t-s;
+     const f=easeOut((l-200)/700);
+     $('feather').style.opacity=f; $('feather').style.transform=`translateY(${px((1-f)*-30)}) scale(${lerp(.7,1,back(clamp((l-200)/800,0,1)))})`;
+     const n=easeOut((l-500)/700);
+     $('brandname').style.opacity=n; $('brandname').style.transform=`translateY(${px((1-n)*20)})`;
+     $('tagline').style.opacity=easeOut((l-900)/700);
+     const u=easeInOut((l-1200)/900); $('underline').style.width=px(u*560);
+     $('meta').style.opacity=easeOut((l-1500)/700);
+    }
+  }
+
+  window.seek=seek;
+  seek(0);
+  // dev-only live preview (never runs during capture)
+  if(!window.__capture){
+    const t0=performance.now();
+    const loop=()=>{seek((performance.now()-t0)%20000);requestAnimationFrame(loop)};
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{window.__ready=true}));
+})();
+</script>
+</body>
+</html>

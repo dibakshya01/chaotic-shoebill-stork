@@ -1,137 +1,251 @@
+---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.16.5
   name: securitychaosexperiments.chaos.shoebill.dev
 spec:
   group: chaos.shoebill.dev
-  scope: Namespaced
   names:
     kind: SecurityChaosExperiment
     listKind: SecurityChaosExperimentList
     plural: securitychaosexperiments
+    shortNames:
+    - sce
+    - scexp
     singular: securitychaosexperiment
-    shortNames: [sce, scexp]
+  scope: Namespaced
   versions:
-    - name: v1alpha1
-      served: true
-      storage: true
-      additionalPrinterColumns:
-        - name: Family
-          type: string
-          jsonPath: .spec.family
-        - name: Mode
-          type: string
-          jsonPath: .spec.injection.mode
-        - name: Blast
-          type: string
-          jsonPath: .spec.blastRadiusClass
-      schema:
-        openAPIV3Schema:
-          type: object
-          description: >
-            A reusable Security Chaos Experiment definition: a declarative hypothesis
-            and its assertions. It is DATA, never a payload with side effects.
-          properties:
-            spec:
-              type: object
-              required: [family, description, hypothesis, injection, assertions]
-              properties:
-                family:
-                  type: string
-                  enum: [mesh, gateway, identity, network, data, supplychain, dr, detection, ai]
-                blastRadiusClass:
-                  type: string
-                  enum: [low, medium, high]
-                description:
-                  type: string
-                controls:
-                  type: array
-                  items: {type: string}
-                attackIds:
-                  type: array
-                  items: {type: string}
-                owaspIds:
-                  type: array
-                  items: {type: string}
-                controlFamilies:
-                  type: array
-                  items: {type: string}
-                hypothesis:
-                  type: object
-                  required: [statement]
+  - additionalPrinterColumns:
+    - jsonPath: .spec.family
+      name: Family
+      type: string
+    - jsonPath: .spec.injection.mode
+      name: Mode
+      type: string
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: SecurityChaosExperiment is the reusable experiment definition.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: SecurityChaosExperimentSpec is the definition.
+            properties:
+              assertions:
+                items:
+                  description: Assertion is one ladder rung checked after detonation.
                   properties:
-                    statement: {type: string}
-                    steadyState:
-                      type: array
-                      items:
-                        type: object
-                        required: [source, query, expect]
-                        properties:
-                          source: {type: string, enum: [prometheus, alertmanager, http, k8saudit, applog, gwlog, canary, mock]}
-                          query: {type: string}
-                          expect:
-                            type: object
-                            properties:
-                              type: {type: string, enum: [present, absent, threshold, count, value, paged]}
-                              op: {type: string, enum: [gt, gte, lt, lte, eq, neq]}
-                              value: {type: number}
-                injection:
+                    expect:
+                      description: Expectation mirrors the control-plane Expectation.
+                      properties:
+                        op:
+                          type: string
+                        type:
+                          type: string
+                        value:
+                          type: number
+                      required:
+                      - type
+                      type: object
+                    justification:
+                      type: string
+                    query:
+                      type: string
+                    requireUuid:
+                      type: boolean
+                    securityRelevant:
+                      type: boolean
+                    sloMs:
+                      format: int64
+                      type: integer
+                    source:
+                      type: string
+                    stage:
+                      enum:
+                      - PREVENTED
+                      - DETECTED
+                      - ALERTED
+                      - PAGED
+                      - TICKETED
+                      type: string
+                  required:
+                  - expect
+                  - query
+                  - source
+                  - stage
                   type: object
-                  required: [detonator, mode]
-                  properties:
-                    detonator: {type: string}
-                    mode: {type: string, enum: [inject, observe_only]}
-                    spec:
+                type: array
+              attackIds:
+                items:
+                  type: string
+                type: array
+              blastRadius:
+                description: BlastRadius bounds the run.
+                properties:
+                  maxDurationSeconds:
+                    type: integer
+                  maxPctReplicas:
+                    type: integer
+                  maxPods:
+                    type: integer
+                  maxTrafficPct:
+                    type: integer
+                  requiresDistinctFaultDomains:
+                    type: boolean
+                type: object
+              blastRadiusClass:
+                type: string
+              capabilities:
+                items:
+                  type: string
+                type: array
+              controlFamilies:
+                items:
+                  type: string
+                type: array
+              controls:
+                items:
+                  type: string
+                type: array
+              description:
+                type: string
+              expectedNoise:
+                items:
+                  type: string
+                type: array
+              family:
+                enum:
+                - mesh
+                - gateway
+                - identity
+                - network
+                - data
+                - supplychain
+                - dr
+                - detection
+                - ai
+                type: string
+              hypothesis:
+                description: Hypothesis states what must hold and how to measure it.
+                properties:
+                  statement:
+                    type: string
+                  steadyState:
+                    items:
+                      description: Probe is a steady-state measurement.
+                      properties:
+                        expect:
+                          description: Expectation mirrors the control-plane Expectation.
+                          properties:
+                            op:
+                              type: string
+                            type:
+                              type: string
+                            value:
+                              type: number
+                          required:
+                          - type
+                          type: object
+                        query:
+                          type: string
+                        source:
+                          type: string
+                      required:
+                      - expect
+                      - query
+                      - source
                       type: object
-                      x-kubernetes-preserve-unknown-fields: true
-                    duration: {type: string}
-                    reversible: {type: boolean}
-                    revertVerification:
-                      type: object
-                      x-kubernetes-preserve-unknown-fields: true
-                assertions:
-                  type: array
-                  minItems: 1
-                  items:
-                    type: object
-                    required: [stage, source, query, expect]
+                    type: array
+                required:
+                - statement
+                type: object
+              injection:
+                description: Injection declares how the condition is produced and
+                  reverted.
+                properties:
+                  detonator:
+                    type: string
+                  duration:
+                    type: string
+                  mode:
+                    enum:
+                    - inject
+                    - observe_only
+                    type: string
+                  reversible:
+                    type: boolean
+                  revertVerification:
+                    description: Probe is a steady-state measurement.
                     properties:
-                      stage: {type: string, enum: [PREVENTED, DETECTED, ALERTED, PAGED, TICKETED]}
-                      source: {type: string, enum: [prometheus, alertmanager, http, k8saudit, applog, gwlog, canary, mock]}
-                      query: {type: string}
                       expect:
-                        type: object
+                        description: Expectation mirrors the control-plane Expectation.
                         properties:
-                          type: {type: string, enum: [present, absent, threshold, count, value, paged]}
-                          op: {type: string, enum: [gt, gte, lt, lte, eq, neq]}
-                          value: {type: number}
-                      sloMs: {type: integer}
-                      requireUuid: {type: boolean}
-                      justification: {type: string}
-                      securityRelevant: {type: boolean}
-                blastRadius:
-                  type: object
-                  properties:
-                    maxPods: {type: integer}
-                    maxPctReplicas: {type: integer}
-                    maxDurationSeconds: {type: integer}
-                    maxTrafficPct: {type: integer}
-                    requiresDistinctFaultDomains: {type: boolean}
-                expectedNoise:
-                  type: array
-                  items: {type: string}
-                promotion:
-                  type: object
-                  properties:
-                    requiresPassIn:
-                      type: array
-                      items: {type: string}
-                    withinDays: {type: integer}
-                capabilities:
-                  type: array
-                  items: {type: string}
-            status:
-              type: object
-              x-kubernetes-preserve-unknown-fields: true
-      subresources:
-        status: {}
+                          op:
+                            type: string
+                          type:
+                            type: string
+                          value:
+                            type: number
+                        required:
+                        - type
+                        type: object
+                      query:
+                        type: string
+                      source:
+                        type: string
+                    required:
+                    - expect
+                    - query
+                    - source
+                    type: object
+                  spec:
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
+                required:
+                - detonator
+                - mode
+                type: object
+              owaspIds:
+                items:
+                  type: string
+                type: array
+              promotion:
+                description: Promotion is the environment-progression gate.
+                properties:
+                  requiresPassIn:
+                    items:
+                      type: string
+                    type: array
+                  withinDays:
+                    type: integer
+                type: object
+            required:
+            - assertions
+            - description
+            - family
+            - hypothesis
+            - injection
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
