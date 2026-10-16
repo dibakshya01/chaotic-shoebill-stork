@@ -37,8 +37,18 @@ you and the few remaining steps that need your account/decisions.
 
 ## ⏭ What still needs you
 
-4. **Homebrew tap** (optional): create `dibakshya01/homebrew-tap` + a PAT, uncomment the `brews:`
-   block in `.goreleaser.yaml`, and the next release publishes a formula. `go install` already works:
+4. **Homebrew tap** — the release pipeline is already wired (`homebrew_casks` in
+   `.goreleaser.yaml`; the token is read from the `HOMEBREW_TAP_GITHUB_TOKEN` secret). Three
+   steps, all needing your GitHub account, then it's automatic on every tag:
+   1. Create a public repo **`dibakshya01/homebrew-tap`** (empty is fine).
+   2. Create a **fine-grained PAT** scoped to just that repo with **Contents: Read and write**
+      (`https://github.com/settings/personal-access-tokens/new`). Classic PAT with `repo` also works.
+   3. Add it as an **Actions secret** named **`HOMEBREW_TAP_GITHUB_TOKEN`** on
+      `chaotic-shoebill-stork` (Settings → Secrets and variables → Actions → New repository secret).
+   Then cut the next tag (`git tag v0.1.1 && git push origin v0.1.1`) — GoReleaser commits
+   `Casks/shoebill.rb` to the tap, and users run `brew install dibakshya01/tap/shoebill`.
+   ⚠️ Set the secret **before** tagging, or the release's brew step fails (re-runnable).
+   Meanwhile `go install` already works:
    `go install github.com/dibakshya01/chaotic-shoebill-stork/cmd/shoebill@latest`.
 5. **Launch** (your accounts, your voice): draft copy is in `LAUNCH.md` (git-ignored, never
    committed) — a Show HN, a Reddit r/netsec / r/kubernetes post, and a short social post.

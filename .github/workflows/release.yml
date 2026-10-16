@@ -25,6 +25,9 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # PAT with write access to dibakshya01/homebrew-tap (see HANDOFF.md). GoReleaser
+          # uses it to push the updated Formula to the tap. Empty if the secret is unset.
+          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
 
   container:
     name: container image (GHCR, cosign-signed)

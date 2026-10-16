@@ -43,10 +43,31 @@ changelog:
   use: github
   sort: asc
 
-# Homebrew tap (optional): create `dibakshya01/homebrew-tap` and a PAT, then uncomment.
-# brews:
-#   - name: shoebill
-#     repository: { owner: dibakshya01, name: homebrew-tap }
-#     homepage: "https://github.com/dibakshya01/chaotic-shoebill-stork"
-#     description: "Security Chaos Engineering — prove your security controls actually work."
-#     license: "Apache-2.0"
+# Homebrew tap (macOS). Requires, in the GitHub repo settings, a secret
+# HOMEBREW_TAP_GITHUB_TOKEN = a PAT with write access to the `dibakshya01/homebrew-tap`
+# repo (see HANDOFF.md). On each tag, GoReleaser commits an updated Casks/shoebill.rb to
+# that tap, so users can `brew install dibakshya01/tap/shoebill`.
+# If the secret is unset, the token below is empty and the publish step fails — set the
+# secret BEFORE pushing the next tag.
+# (Linux users: use the container image, the release binaries, or `go install`.)
+homebrew_casks:
+  - name: shoebill
+    repository:
+      owner: dibakshya01
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    directory: Casks
+    homepage: "https://github.com/dibakshya01/chaotic-shoebill-stork"
+    description: "Security Chaos Engineering — prove your security controls actually work."
+    license: "Apache-2.0"
+    commit_author:
+      name: goreleaser-bot
+      email: noreply@github.com
+    # The binaries are not Apple-notarized, so strip the quarantine flag on install;
+    # otherwise Gatekeeper blocks the CLI on first run.
+    hooks:
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/shoebill"]
+          end
